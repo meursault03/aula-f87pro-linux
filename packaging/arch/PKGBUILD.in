@@ -1,0 +1,26 @@
+pkgname=aula-f87pro
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='Native GTK4 configuration for the AULA F87 Pro keyboard'
+arch=('x86_64')
+url='https://github.com/meursault03/aula-f87pro-linux'
+license=('MIT')
+depends=('gtk4>=4.10' 'glibc>=2.39' 'gcc-libs' 'systemd')
+options=('!strip')
+source=("https://github.com/meursault03/aula-f87pro-linux/releases/download/v${pkgver}/aula-f87pro-${pkgver}-linux-x86_64.tar.gz")
+sha256sums=('@SHA256@')
+
+package() {
+  cd "$srcdir/aula-f87pro-${pkgver}-linux-x86_64"
+  install -Dm755 bin/aula-f87pro "$pkgdir/usr/bin/aula-f87pro"
+  install -Dm755 bin/aula-f87pro-gui "$pkgdir/usr/bin/aula-f87pro-gui"
+  install -Dm644 share/applications/io.github.aula_f87pro.Control.desktop \
+    "$pkgdir/usr/share/applications/io.github.aula_f87pro.Control.desktop"
+  install -Dm644 share/icons/hicolor/scalable/apps/aula-f87pro.svg \
+    "$pkgdir/usr/share/icons/hicolor/scalable/apps/aula-f87pro.svg"
+  install -Dm644 share/udev/rules.d/70-aula-f87pro.rules \
+    "$pkgdir/usr/lib/udev/rules.d/70-aula-f87pro.rules"
+  install -Dm644 share/doc/aula-f87pro/LICENSE "$pkgdir/usr/share/licenses/aula-f87pro/LICENSE"
+  install -Dm644 share/doc/aula-f87pro/README.md "$pkgdir/usr/share/doc/aula-f87pro/README.md"
+  install -Dm644 share/doc/aula-f87pro/THIRD_PARTY_NOTICES.txt "$pkgdir/usr/share/licenses/aula-f87pro/THIRD_PARTY_NOTICES.txt"
+}

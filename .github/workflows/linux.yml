@@ -1,0 +1,100 @@
+name: Linux
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install build and UI test dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libgtk-4-dev python3 xvfb xauth xdotool imagemagick dbus-x11 fonts-dejavu-core desktop-file-utils
+      - name: Install Rust
+        run: rustup update stable --no-self-update && rustup default stable && rustup component add rustfmt clippy
+      - name: Check tagged version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: python3 -c 'import os,tomllib; assert os.environ["GITHUB_REF_NAME"] == "v" + tomllib.load(open("Cargo.toml","rb"))["package"]["version"]'
+      - name: Check format, tests and lints
+        run: |
+          cargo fmt --check
+          cargo test --locked --features gui
+          cargo clippy --locked --all-targets --features gui -- -D warnings
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+          desktop-file-validate packaging/share/applications/*.desktop
+      - name: Build binaries
+        run: cargo build --locked --features gui --bins && cargo build --locked --release --features gui --bins
+      - name: Test native GTK with isolated demonstration data
+        run: |
+          xvfb-run -a -s '-screen 0 1440x1200x24' env -u WAYLAND_DISPLAY GTK_THEME=Adwaita:dark dbus-run-session -- python3 tests/gui_smoke.py
+          xvfb-run -a -s '-screen 0 1440x1200x24' env -u WAYLAND_DISPLAY GTK_THEME=Adwaita:dark F87_TEST_RADIO=1 dbus-run-session -- python3 tests/gui_smoke.py
+      - name: Package Linux binaries
+        run: |
+          python3 scripts/package.py --format tar
+          python3 scripts/package.py --format deb
+          python3 scripts/package.py --arch-recipe dist/aula-f87pro-*-linux-x86_64.tar.gz
+          dpkg-deb --info dist/*.deb
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux
+          path: dist/*
+          if-no-files-found: error
+      - name: Retain UI diagnostics
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ui-diagnostics
+          path: analysis/live/gui-*
+
+  arch:
+    needs: linux
+    runs-on: ubuntu-24.04
+    container: archlinux:base-devel
+    timeout-minutes: 15
+    steps:
+      - name: Install native runtime and packaging tools
+        run: pacman -Syu --noconfirm --needed gtk4 git python unzip
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux
+          path: /tmp/aula-release
+      - name: Build and inspect the Arch package
+        run: |
+          useradd -m builder
+          chown -R builder:builder /tmp/aula-release
+          runuser -u builder -- sh -c 'cd /tmp/aula-release && makepkg --noconfirm'
+          pacman -Qip /tmp/aula-release/*.pkg.tar.zst
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: arch
+          path: /tmp/aula-release/*.pkg.tar.zst
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, arch]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: '*'
+          merge-multiple: true
+          path: dist
+      - name: Publish the Linux preview release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          sha256sum *.tar.gz *.deb *.pkg.tar.zst PKGBUILD > SHA256SUMS
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease --title "AULA F87 Pro $GITHUB_REF_NAME · Linux preview" --notes-file ../packaging/RELEASE.md ./*.tar.gz ./*.deb ./*.pkg.tar.zst ./PKGBUILD ./SHA256SUMS

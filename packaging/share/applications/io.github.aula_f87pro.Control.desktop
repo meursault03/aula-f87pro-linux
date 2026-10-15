@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=AULA F87 Pro
+Comment=Lighting, key assignments, macros and profiles for the AULA F87 Pro
+Comment[pt_BR]=Iluminação, atribuições, macros e perfis para o AULA F87 Pro
+Exec=aula-f87pro-gui
+Icon=aula-f87pro
+Terminal=false
+Categories=Settings;HardwareSettings;
+Keywords=AULA;F87;keyboard;RGB;teclado;
+StartupNotify=true

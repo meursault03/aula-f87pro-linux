@@ -1,0 +1,27 @@
+.suite { background: @theme_bg_color; }
+.sidebar { padding: 24px 14px; background: alpha(@theme_fg_color, 0.035); border-right: 1px solid alpha(@theme_fg_color, 0.10); }
+.workspace { padding: 20px 24px; }
+.device-title { font-size: 28px; font-weight: 700; letter-spacing: -0.7px; }
+.section-title { font-size: 16px; font-weight: 600; }
+.muted { opacity: 0.70; font-size: 12px; }
+.eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1px; opacity: 0.65; }
+.device-item { padding: 12px 8px; }
+.device-name { font-weight: 600; font-size: 13px; }
+.navigation-sidebar { background: transparent; }
+.navigation-sidebar row { border-radius: 10px; margin-bottom: 4px; }
+.navigation-sidebar row:selected { background: alpha(@theme_selected_bg_color, 0.14); color: @theme_fg_color; }
+.keyboard { padding: 16px; border-radius: 14px; background: #24272c; border: 1px solid #15171a; margin: 8px 0; }
+.keycap { min-width: 0; min-height: 0; padding: 0; border-radius: 5px; background: #393d44; color: #f1f3f5; border: 1px solid #51565e; border-bottom: 3px solid #15171a; box-shadow: none; font-size: 10px; font-weight: 500; }
+.keycap:hover { background: #4c525b; }
+.keycap:checked { background: #2764c1; border-color: #72a8f8; border-bottom-color: #153b78; color: white; }
+.keycap:focus-visible { outline: 2px solid #94c4ff; outline-offset: 2px; }
+.board-caption { font-size: 12px; opacity: 0.70; }
+.settings { padding: 20px; border-radius: 12px; background: alpha(@theme_base_color, 0.70); border: 1px solid alpha(@theme_fg_color, 0.10); }
+.settings button { padding: 9px 16px; }
+.settings dropdown button { padding: 8px 12px; }
+.status { font-size: 12px; }
+.action-bar { padding: 14px 24px; border-top: 1px solid alpha(@theme_fg_color, 0.12); background: @theme_bg_color; }
+.action-bar button { padding: 8px 14px; }
+.pending-text { color: @theme_fg_color; font-weight: 600; }
+.connection { font-size: 12px; opacity: 0.75; }
+.keycap.edited { border-top-color: #ffc66b; border-left-color: #ffc66b; border-right-color: #ffc66b; }
