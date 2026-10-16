@@ -1,10 +1,10 @@
-**AULA F87 Pro for Linux 0.2.0**, a native Rust/GTK4 companion.
+**AULA F87 Pro for Linux 0.3.0**, a native Rust/GTK4 companion.
 
-- Portuguese and English interfaces. Choose a language in Settings and reopen the app.
-- Device-reported version, five debounce stages, idle sleep and experimental Tap sensitivity.
-- Start at login, quit/minimize behavior and keyboard shortcuts for tab navigation.
-- USB lighting, key assignments, macros and local profiles, with backup, readback and undo.
-- Experimental 2.4 GHz lighting and key assignments on layers 0/1.
+- Experimental USB support for the standard AULA F87, with the detected model shown in the app.
+- Corrected the lighting list to match the 14 effects enabled by the original software.
+  Rainbow wheel, Trail, Sweep and Storm are no longer offered for these models.
+- Profiles and backups from another keyboard model cannot be applied.
+- Shorter English and Portuguese guides focused on installation and everyday use.
 
 ### Linux downloads
 
@@ -18,11 +18,9 @@ Open **AULA F87 Pro** from the application menu. Reconnect the keyboard or recei
 after installing device-access rules. Close an older instance before updating.
 Profiles and app preferences remain local.
 
-Radio support is experimental and reads can be intermittent. Radio macro editing
-and layers 2/3 require USB. Bluetooth, firmware flashing and full factory reset are
-not implemented. Restoring the three behavior settings preserves lighting, keys and
-macros. Debounce stages are not verified millisecond values; Tap semantics, sleep
-timing and macro timing/playback modes still need physical validation.
+Standard F87 support has not yet been validated on physical hardware and requires
+USB. F87 Pro radio support remains experimental; macro editing requires USB.
+Bluetooth, firmware flashing and per-key RGB customization are not available.
 
 [English guide](https://github.com/meursault03/aula-f87pro-linux#readme) ·
 [Guia em português](https://github.com/meursault03/aula-f87pro-linux/blob/main/README.pt.md)

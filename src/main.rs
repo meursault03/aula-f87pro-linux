@@ -1,7 +1,7 @@
 use aula_f87pro::discovery::Transport;
 use aula_f87pro::state::{self, Snapshot};
 use aula_f87pro::{
-    KEYS, led_effect, macro_request, read_request, remap_matrix, response_payload,
+    KEYS, Model, led_effect, macro_request, read_request, remap_matrix, response_payload,
     write_led_request, write_matrix_request,
 };
 use serde::Serialize;
@@ -38,6 +38,19 @@ struct Device {
     transport: Transport,
 }
 
+fn identify(identity: &[u8], transport: Transport) -> io::Result<Model> {
+    let model = Model::from_identity(identity).ok_or_else(|| {
+        io::Error::other(format!("unrecognized keyboard identity: {identity:02x?}"))
+    })?;
+    if model == Model::F87 && transport != Transport::UsbCable {
+        return Err(io::Error::new(
+            ErrorKind::Unsupported,
+            "AULA F87 standard configuration currently requires USB cable",
+        ));
+    }
+    Ok(model)
+}
+
 impl Device {
     fn read(&self, operation: u8, argument: u8, length: u16) -> io::Result<Vec<u8>> {
         if self.transport == Transport::UsbCable {
@@ -61,11 +74,7 @@ impl StateDevice for Device {
             return self.file.snapshot();
         }
         let identity = self.read(0x82, 1, 6)?;
-        if identity != [3, 0, 0, 0, 1, 11] {
-            return Err(io::Error::other(
-                "wireless device identity differs from F87 Pro configuration",
-            ));
-        }
+        identify(&identity, self.transport)?;
         let state = Snapshot {
             version: 2,
             identity,
@@ -109,11 +118,7 @@ impl StateDevice for Device {
 impl StateDevice for File {
     fn snapshot(&self) -> io::Result<Snapshot> {
         let identity = read_feature(self, 0x82, 1, 6)?;
-        if identity != [3, 0, 0, 0, 1, 11] {
-            return Err(io::Error::other(
-                "device identity differs from F87 Pro configuration",
-            ));
-        }
+        identify(&identity, Transport::UsbCable)?;
         let state = Snapshot {
             version: 1,
             identity,
@@ -238,10 +243,25 @@ fn apply_state(
             "keyboard changed since it was loaded; refresh before applying",
         ));
     }
+    if desired.identity != original.identity {
+        return Err(io::Error::new(
+            ErrorKind::Unsupported,
+            "profile belongs to another keyboard model",
+        ));
+    }
     if desired.version != original.version {
         return Err(io::Error::new(
             ErrorKind::Unsupported,
             "profile transport differs: USB profiles require USB; 2.4 GHz profiles require the receiver",
+        ));
+    }
+    if desired.leds != original.leds
+        && desired.leds[9] == 0
+        && !aula_f87pro::LED_EFFECTS.contains(&desired.leds[10])
+    {
+        return Err(io::Error::new(
+            ErrorKind::Unsupported,
+            "lighting effect is unavailable in the original app for this keyboard",
         ));
     }
     if original.version == 2 && desired.leds[14] != original.leds[14] {
@@ -447,13 +467,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             println!("{}", device.path.display());
         }
         if devices.is_empty() {
-            println!("No compatible AULA F87 Pro cable or 2.4 GHz receiver interface.");
+            println!("No compatible AULA F87/F87 Pro USB or F87 Pro 2.4 GHz receiver interface.");
         }
         return Ok(());
     }
     if devices.len() != 1 {
         return Err(
-            "requires exactly one compatible AULA F87 Pro cable or 2.4 GHz receiver interface"
+            "requires exactly one compatible AULA F87/F87 Pro USB or F87 Pro 2.4 GHz receiver interface"
                 .into(),
         );
     }
@@ -501,12 +521,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         device.read(0x82, 1, 6)?
     };
-    if identity != [3, 0, 0, 0, 1, 0x0b] {
-        return Err(
-            format!("device identity differs from F87 Pro configuration: {identity:02x?}").into(),
-        );
+    let model = identify(&identity, device.transport)?;
+    if let Some(backup) = &restoration
+        && backup[..6] != identity
+    {
+        return Err("backup belongs to another keyboard model".into());
     }
-    println!("F87 Pro identity: {identity:02x?}");
+    println!("{} identity: {identity:02x?}", model.name());
     let (read_operation, length) = if matrix_command {
         (0x83, 512)
     } else {
@@ -564,6 +585,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "backup uses another transport; restore it using the connection where it was saved"
                 .into(),
         );
+    }
+    if !matrix_command
+        && changed != original
+        && changed[9] == 0
+        && !aula_f87pro::LED_EFFECTS.contains(&changed[10])
+    {
+        return Err("lighting effect is unavailable in the original app for this keyboard".into());
     }
     if changed == original {
         println!("Configuration already matches.");
@@ -676,6 +704,29 @@ mod tests {
     }
 
     #[test]
+    fn identifies_only_declared_models_and_keeps_standard_f87_radio_disabled() {
+        assert_eq!(
+            identify(&[3, 0, 0, 0, 0, 0x8f], Transport::UsbCable).unwrap(),
+            Model::F87
+        );
+        for transport in [Transport::UsbCable, Transport::Receiver24G] {
+            assert_eq!(
+                identify(&[3, 0, 0, 0, 1, 11], transport).unwrap(),
+                Model::F87Pro
+            );
+            for identity in [
+                vec![3, 0, 0, 0, 0, 0xa9],
+                vec![3, 0, 0, 0, 0, 0],
+                vec![3, 0, 0],
+                vec![3, 0, 0, 0, 1, 11, 0],
+            ] {
+                assert!(identify(&identity, transport).is_err());
+            }
+        }
+        assert!(identify(&[3, 0, 0, 0, 0, 0x8f], Transport::Receiver24G).is_err());
+    }
+
+    #[test]
     fn apply_saves_before_writing_and_changes_only_required_parts() {
         let device = device(vec![]);
         let original = device.snapshot().unwrap();
@@ -693,6 +744,68 @@ mod tests {
         assert!(result.changed);
         assert_eq!(result.backup.as_deref(), Some("backup.json"));
         assert_eq!(result.state, desired);
+    }
+
+    #[test]
+    fn standard_f87_usb_applies_and_restores_lighting_with_its_own_identity() {
+        let device = device(vec![]);
+        device.state.borrow_mut().identity = vec![3, 0, 0, 0, 0, 0x8f];
+        let original = device.snapshot().unwrap();
+        let mut desired = original.clone();
+        desired.leds[10] = 17;
+        apply_state(&device, desired.clone(), &original, |saved| {
+            assert_eq!(saved.identity, original.identity);
+            assert_eq!(device.calls.get(), 0);
+            Ok("f87-backup.json".into())
+        })
+        .unwrap();
+        assert_eq!(*device.parts.borrow(), [Part::Leds]);
+        apply_state(&device, original.clone(), &desired, |_| {
+            Ok("undo.json".into())
+        })
+        .unwrap();
+        assert_eq!(device.snapshot().unwrap(), original);
+    }
+
+    #[test]
+    fn cross_model_profiles_never_backup_or_write() {
+        for identity in [vec![3, 0, 0, 0, 0, 0x8f], vec![3, 0, 0, 0, 1, 11]] {
+            let device = device(vec![]);
+            let mut desired = device.snapshot().unwrap();
+            device.state.borrow_mut().identity = identity;
+            let original = device.snapshot().unwrap();
+            desired.identity = if original.identity[4] == 0 {
+                vec![3, 0, 0, 0, 1, 11]
+            } else {
+                vec![3, 0, 0, 0, 0, 0x8f]
+            };
+            desired.leds[10] = 2;
+            assert!(
+                apply_state(&device, desired, &original, |_| panic!(
+                    "foreign profile backed up"
+                ))
+                .is_err()
+            );
+            assert_eq!(device.calls.get(), 0);
+            assert_eq!(device.snapshot().unwrap(), original);
+        }
+    }
+
+    #[test]
+    fn profiles_cannot_select_effects_hidden_by_original_app() {
+        let device = device(vec![]);
+        let original = device.snapshot().unwrap();
+        for effect in [6, 9, 14, 18] {
+            let mut desired = original.clone();
+            desired.leds[10] = effect;
+            assert!(
+                apply_state(&device, desired, &original, |_| panic!(
+                    "masked effect backed up"
+                ))
+                .is_err()
+            );
+        }
+        assert_eq!(device.calls.get(), 0);
     }
 
     #[test]

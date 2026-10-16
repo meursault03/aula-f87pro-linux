@@ -7,7 +7,7 @@ prepare macros over USB, adjust keyboard behavior, and keep named profiles on
 your computer. Built with
 Rust and GTK4, using a protocol reconstructed from the original desktop driver.
 
-[Download Linux preview](https://github.com/meursault03/aula-f87pro-linux/releases/tag/v0.2.0) ·
+[Download Linux preview](https://github.com/meursault03/aula-f87pro-linux/releases/tag/v0.3.0) ·
 [Install](#install-on-linux) · [Settings](#settings) ·
 [Connection support](#connection-support) ·
 [Build from source](CONTRIBUTING.md)
@@ -20,14 +20,14 @@ English and Portuguese, with screenshots matching the language of each README.*
 
 ## Install on Linux
 
-**Version 0.2.0 is an experimental preview for Linux x86_64.**
-Download a package from [Releases](https://github.com/meursault03/aula-f87pro-linux/releases/tag/v0.2.0):
+**Version 0.3.0 is an experimental preview for Linux x86_64.**
+Download a package from [Releases](https://github.com/meursault03/aula-f87pro-linux/releases/tag/v0.3.0):
 
 | System | Download | Install |
 | --- | --- | --- |
-| Arch Linux | `aula-f87pro-0.2.0-1-x86_64.pkg.tar.zst` | `sudo pacman -U ./aula-f87pro-0.2.0-1-x86_64.pkg.tar.zst` |
-| Ubuntu 24.04+ / Debian 13+ | `aula-f87pro_0.2.0_amd64.deb` | `sudo apt install ./aula-f87pro_0.2.0_amd64.deb` |
-| Other compatible distributions | `aula-f87pro-0.2.0-linux-x86_64.tar.gz` | Extract and run `python3 install.py --udev` inside its folder. |
+| Arch Linux | `aula-f87pro-0.3.0-1-x86_64.pkg.tar.zst` | `sudo pacman -U ./aula-f87pro-0.3.0-1-x86_64.pkg.tar.zst` |
+| Ubuntu 24.04+ / Debian 13+ | `aula-f87pro_0.3.0_amd64.deb` | `sudo apt install ./aula-f87pro_0.3.0_amd64.deb` |
+| Other compatible distributions | `aula-f87pro-0.3.0-linux-x86_64.tar.gz` | Extract and run `python3 install.py --udev` inside its folder. |
 
 The archive needs GTK4 ≥ 4.10, glibc ≥ 2.39 and Python 3 for installation; it is
 not a self-contained AppImage. Its installer writes to `~/.local/bin` and
@@ -96,25 +96,19 @@ to minimize.
 
 ## Connection support
 
+**AULA F87 Pro**
+
 | Feature | USB cable | 2.4 GHz receiver |
 | --- | --- | --- |
-| Lighting: 18 effects, brightness, speed and palette | Supported | Supported, experimental |
+| 14 lighting effects, brightness, speed and color | Available | Experimental |
 | Key assignments and shortcuts | Layers 0–3 | Layers 0–1 |
-| Macro editing and new macro bindings | Supported | Preserved; editing requires USB |
-| Named profiles, RGB preview and undo | Supported | Supported for accessible state |
+| Macro editing | Available | Requires USB |
+| Profiles, RGB preview and undo | Available | Available |
 
-Supported interfaces: USB `258a:010c`, receiver `3554:fa09`, and keyboard identity
-`03 00 00 00 01 0b`. When both connections are present, the app prefers USB.
-The receiver's presence alone does not mean that the keyboard is awake.
+**Standard AULA F87:** experimental USB support, pending hardware validation.
+2.4 GHz configuration is not supported for this model.
 
-Radio reads can be intermittent. The app retries missing fragments and requires
-two complete equal reads before accepting a block. Incomplete state does not
-permit a write. Radio backups contain the two exposed key layers and the macro
-memory prefix actually read; unread layers and macro banks are never written.
-Full profiles use the format of the connection where they were saved.
-
-**Bluetooth, firmware flashing and arbitrary per-key RGB are not implemented.**
-The timing and every playback mode of macros still need physical validation.
+Bluetooth, firmware updates and per-key RGB customization are not available.
 
 ## Macros over USB
 

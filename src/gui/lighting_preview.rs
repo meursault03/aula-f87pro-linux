@@ -11,7 +11,11 @@ pub struct Lighting {
 
 impl Lighting {
     pub fn read(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != 128 || bytes[9] != 0 || !(1..=18).contains(&bytes[10]) {
+        if bytes.len() != 128
+            || bytes[9] != 0
+            || bytes[10] == 0
+            || !aula_f87pro::LED_EFFECTS.contains(&bytes[10])
+        {
             return None;
         }
         let offset = 58 + 2 * usize::from(bytes[10] - 1);
@@ -34,18 +38,14 @@ impl Lighting {
             2 => 0.08 + 0.92 * (0.5 - 0.5 * (TAU * t).cos()),
             4 => trail(t - x - y * 0.2),
             5 => trail(t + x * 7.13 - y),
-            6 => wave((y * 0.35 - 0.175).atan2(x - 0.5) / TAU - t),
             7 => wave(x * 2.0 - t),
             8 => wave(t * 0.7 + x * 13.37 + y * 7.17).powi(3),
-            9 => trail(t - x * 0.8 - y * 0.2),
             10 => wave(x + y * 0.5 - t),
             11 => 0.15 + 0.85 * wave(x * 2.0 - t),
             12 => wave(radius * 3.0 - t),
             13 => wave(y - (TAU * (x - t)).sin() * 0.5),
-            14 => wave(x - (0.5 + 0.5 * (t * TAU).sin())),
             16 => trail(t - y - x * 0.15),
             17 => wave(radius * 4.0 - t),
-            18 => wave(t * 1.7 + (x * 19.7 + y * 31.1).sin()).powi(3),
             _ => 0.0,
         } * self.brightness;
         let multicolor = self.palette == 7 || [3, 15, 16, 17].contains(&self.effect);
@@ -53,7 +53,7 @@ impl Lighting {
             let hue = match self.effect {
                 1 => x * 7.13 + y * 13.37,
                 3 => -t * 0.4,
-                6 | 15 => (y * 0.35 - 0.175).atan2(x - 0.5) / TAU - t,
+                15 => (y * 0.35 - 0.175).atan2(x - 0.5) / TAU - t,
                 17 => radius * 2.0 - t,
                 _ => x + y * 0.2 - t * 0.4,
             };
@@ -156,7 +156,15 @@ mod tests {
 
     #[test]
     fn unknown_custom_and_off_have_no_invented_colors() {
-        for bytes in [vec![], leds(0, 4, 0, 0), leds(19, 4, 0, 0)] {
+        for bytes in [
+            vec![],
+            leds(0, 4, 0, 0),
+            leds(6, 4, 0, 0),
+            leds(9, 4, 0, 0),
+            leds(14, 4, 0, 0),
+            leds(18, 4, 0, 0),
+            leds(19, 4, 0, 0),
+        ] {
             assert!(Lighting::read(&bytes).is_none());
         }
         let mut custom = leds(1, 4, 0, 0);
@@ -180,7 +188,12 @@ mod tests {
 
     #[test]
     fn animated_effects_are_bounded_and_change_over_time() {
-        for (effect, palette) in (2..=18).flat_map(|effect| (0..=7).map(move |p| (effect, p))) {
+        for (effect, palette) in aula_f87pro::LED_EFFECTS
+            .iter()
+            .copied()
+            .filter(|&id| id >= 2)
+            .flat_map(|effect| (0..=7).map(move |p| (effect, p)))
+        {
             let preview = Lighting::read(&leds(effect, 4, 3, palette)).unwrap();
             let mut changes = false;
             for key in 0..87 {

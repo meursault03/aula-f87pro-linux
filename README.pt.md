@@ -7,7 +7,7 @@ iluminação, remapeie teclas, prepare macros por USB, ajuste o comportamento do
 teclado e mantenha perfis nomeados no seu computador. Feito em Rust e GTK4, com um protocolo reconstruído a partir
 do programa original.
 
-[Baixar para Linux](https://github.com/meursault03/aula-f87pro-linux/releases/tag/v0.2.0) ·
+[Baixar para Linux](https://github.com/meursault03/aula-f87pro-linux/releases/tag/v0.3.0) ·
 [Instalação](#instalar-no-linux) · [Configurações](#configurações) ·
 [Conexões](#suporte-por-conexão) ·
 [Compilar](CONTRIBUTING.md)
@@ -19,14 +19,14 @@ selecionada; não transmite as cores atuais dos LEDs físicos.*
 
 ## Instalar no Linux
 
-**A versão 0.2.0 é uma prévia experimental para Linux x86_64.**
-Baixe o pacote na [página de versões](https://github.com/meursault03/aula-f87pro-linux/releases/tag/v0.2.0):
+**A versão 0.3.0 é uma prévia experimental para Linux x86_64.**
+Baixe o pacote na [página de versões](https://github.com/meursault03/aula-f87pro-linux/releases/tag/v0.3.0):
 
 | Sistema | Arquivo | Instalação |
 | --- | --- | --- |
-| Arch Linux | `aula-f87pro-0.2.0-1-x86_64.pkg.tar.zst` | `sudo pacman -U ./aula-f87pro-0.2.0-1-x86_64.pkg.tar.zst` |
-| Ubuntu 24.04+ / Debian 13+ | `aula-f87pro_0.2.0_amd64.deb` | `sudo apt install ./aula-f87pro_0.2.0_amd64.deb` |
-| Outras distribuições compatíveis | `aula-f87pro-0.2.0-linux-x86_64.tar.gz` | Extraia e execute `python3 install.py --udev` dentro da pasta. |
+| Arch Linux | `aula-f87pro-0.3.0-1-x86_64.pkg.tar.zst` | `sudo pacman -U ./aula-f87pro-0.3.0-1-x86_64.pkg.tar.zst` |
+| Ubuntu 24.04+ / Debian 13+ | `aula-f87pro_0.3.0_amd64.deb` | `sudo apt install ./aula-f87pro_0.3.0_amd64.deb` |
+| Outras distribuições compatíveis | `aula-f87pro-0.3.0-linux-x86_64.tar.gz` | Extraia e execute `python3 install.py --udev` dentro da pasta. |
 
 O arquivo `.tar.gz` precisa de GTK4 ≥ 4.10, glibc ≥ 2.39 e Python 3 para instalar;
 não é um AppImage com todas as bibliotecas incluídas. O instalador usa
@@ -96,27 +96,19 @@ aplicativo** no menu superior para sair.
 
 ## Suporte por conexão
 
+**AULA F87 Pro**
+
 | Recurso | Cabo USB | Receptor 2,4 GHz |
 | --- | --- | --- |
-| 18 efeitos, brilho, velocidade e paleta | Disponível | Disponível, experimental |
+| 14 efeitos, brilho, velocidade e cor | Disponível | Experimental |
 | Teclas e atalhos | Camadas 0–3 | Camadas 0–1 |
-| Edição e novos vínculos de macros | Disponível | Macros preservadas; edição exige cabo |
-| Perfis, prévia RGB e desfazer | Disponível | Disponível para o estado acessível |
+| Edição de macros | Disponível | Exige cabo USB |
+| Perfis, prévia RGB e desfazer | Disponível | Disponível |
 
-Interfaces admitidas: USB `258a:010c`, receptor `3554:fa09` e identificação do
-teclado `03 00 00 00 01 0b`. Quando as duas conexões estão presentes, o programa
-prefere o cabo. Detectar o receptor não confirma que o teclado esteja acordado.
+**AULA F87 padrão:** suporte USB experimental, pendente de validação física.
+A configuração por 2,4 GHz não está disponível para esse modelo.
 
-A leitura pelo rádio pode ser intermitente. O programa repete consultas para
-recuperar fragmentos e exige duas leituras completas iguais antes de aceitar
-um bloco. Estado incompleto não permite gravação. O backup do rádio contém as
-duas camadas expostas e somente o trecho de macros efetivamente lido; camadas
-e bancos não lidos nunca são gravados. Perfis completos usam o formato da conexão
-em que foram salvos.
-
-**Bluetooth, atualização de firmware e RGB arbitrário por tecla ainda não estão
-implementados.** A temporização e todos os modos de reprodução de macros ainda
-precisam de validação física.
+Bluetooth, atualização de firmware e personalização RGB por tecla não estão disponíveis.
 
 ## Macros por USB
 

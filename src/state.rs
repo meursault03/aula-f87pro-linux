@@ -10,10 +10,14 @@ pub fn legacy_backup(bytes: &[u8], matrix: bool) -> io::Result<(Option<u8>, &[u8
     } else {
         bytes.len() == 6 + 128
     };
-    if !valid_length || bytes[..6] != [3, 0, 0, 0, 1, 11] || (matrix && bytes[6] > 3) {
+    if !valid_length
+        || crate::Model::from_identity(&bytes[..6]).is_none()
+        || (matrix && bytes[6] > 3)
+        || (matrix && bytes.len() == 511 && bytes[..6] != [3, 0, 0, 0, 1, 11])
+    {
         return Err(io::Error::new(
             ErrorKind::InvalidData,
-            "invalid F87 Pro backup",
+            "invalid F87/F87 Pro backup",
         ));
     }
     Ok((matrix.then(|| bytes[6]), &bytes[header..]))
@@ -45,10 +49,16 @@ impl Snapshot {
     pub fn with_lighting_from(&self, profile: &Self) -> io::Result<Self> {
         self.validate()?;
         profile.validate()?;
-        if profile.leds[9] != 0 || profile.leds[10] > 18 {
+        if self.identity != profile.identity {
             return Err(io::Error::new(
                 ErrorKind::Unsupported,
-                "custom lighting preview and transfer are not supported",
+                "profile belongs to another keyboard model",
+            ));
+        }
+        if profile.leds[9] != 0 || !crate::LED_EFFECTS.contains(&profile.leds[10]) {
+            return Err(io::Error::new(
+                ErrorKind::Unsupported,
+                "custom or unavailable lighting preview and transfer are not supported",
             ));
         }
         let mut draft = self.clone();
@@ -69,7 +79,9 @@ impl Snapshot {
                 ));
             }
         };
-        if self.identity != [3, 0, 0, 0, 1, 11]
+        let model = crate::Model::from_identity(&self.identity);
+        if model.is_none()
+            || (self.version == 2 && model != Some(crate::Model::F87Pro))
             || self.leds.len() != 128
             || self.layers.len() != layer_count
             || self.layers.iter().any(|layer| layer.len() != matrix_length)
@@ -77,7 +89,7 @@ impl Snapshot {
         {
             return Err(io::Error::new(
                 ErrorKind::InvalidData,
-                "invalid F87 Pro snapshot",
+                "invalid F87/F87 Pro snapshot",
             ));
         }
         Ok(())
@@ -151,6 +163,69 @@ mod tests {
             leds: include_bytes!("../tests/fixtures/f87pro-led-read.bin").to_vec(),
             layers: vec![include_bytes!("../tests/fixtures/f87pro-matrix-layer0.bin").to_vec(); 4],
             macros: vec![0; 4096],
+        }
+    }
+
+    #[test]
+    fn standard_f87_usb_state_and_effects_preserve_device_data() {
+        // Synthetic state using the identity declared by Dev/kb/1/KB.ini, not a hardware capture.
+        let mut original = fixture();
+        original.identity = vec![3, 0, 0, 0, 0, 0x8f];
+        assert_eq!(decode(&original.encode().unwrap()).unwrap(), original);
+        for &effect in crate::LED_EFFECTS {
+            let mut changed = original.clone();
+            changed.leds = crate::led_settings(
+                original.leds.as_slice().try_into().unwrap(),
+                effect,
+                4,
+                3,
+                7,
+            )
+            .unwrap()
+            .to_vec();
+            assert_eq!(changed.leds[10], effect);
+            assert_eq!(changed.identity, original.identity);
+            assert_eq!(changed.layers, original.layers);
+            assert_eq!(changed.macros, original.macros);
+            assert_eq!(decode(&changed.encode().unwrap()).unwrap(), changed);
+        }
+        let mut backup = original.identity.clone();
+        backup.extend_from_slice(&original.leds);
+        assert!(legacy_backup(&backup, false).is_ok());
+        let mut matrix_backup = original.identity.clone();
+        matrix_backup.push(0);
+        matrix_backup.extend_from_slice(&original.layers[0]);
+        assert!(legacy_backup(&matrix_backup, true).is_ok());
+        matrix_backup.truncate(511);
+        assert!(legacy_backup(&matrix_backup, true).is_err());
+        let mut radio = original;
+        radio.version = 2;
+        radio.layers.truncate(2);
+        for layer in &mut radio.layers {
+            layer.truncate(504);
+        }
+        radio.macros.truncate(512);
+        assert!(radio.validate().is_err());
+    }
+
+    #[test]
+    fn rgb_loading_rejects_a_profile_from_another_model() {
+        let pro = fixture();
+        let mut standard = pro.clone();
+        standard.identity = vec![3, 0, 0, 0, 0, 0x8f];
+        assert!(standard.with_lighting_from(&pro).is_err());
+        assert!(pro.with_lighting_from(&standard).is_err());
+        assert!(standard.with_lighting_from(&standard).is_ok());
+    }
+
+    #[test]
+    fn rgb_profiles_reject_masked_effects_but_backups_preserve_them() {
+        let original = fixture();
+        for effect in [6, 9, 14, 18] {
+            let mut profile = original.clone();
+            profile.leds[10] = effect;
+            assert_eq!(decode(&profile.encode().unwrap()).unwrap(), profile);
+            assert!(original.with_lighting_from(&profile).is_err());
         }
     }
 

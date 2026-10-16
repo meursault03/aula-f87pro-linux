@@ -48,9 +48,14 @@ def main():
                     "layers": [list((fixture / "f87pro-matrix-layer0.bin").read_bytes()) for _ in range(4)],
                     "macros": [0] * 4096}
         english = os.environ.get("F87_TEST_ENGLISH") == "1"
+        standard = os.environ.get("F87_TEST_STANDARD") == "1"
+        if standard:
+            # Synthetic F87 identity with shared-layout Pro fixtures, not an F87 capture.
+            original["identity"] = [3, 0, 0, 0, 0, 0x8f]
         example = "Example" if english else "Exemplo"
         imported_name = "Gaming" if english else "Jogos"
         radio = os.environ.get("F87_TEST_RADIO") == "1"
+        assert not (radio and original["identity"][-1] == 0x8f), "F87 standard smoke is USB only"
         if radio:
             cable_rgb = json.loads(json.dumps(original))
             cable_rgb["leds"][10] = 2
@@ -184,7 +189,11 @@ def main():
                     click(960, 95)  # Reload also exercises the mock when no real HID is present.
                 wait_calls("snapshot", 1)
                 click(250, 645)
-                key("Home", "Down", "Down", "Return")
+                if standard:
+                    # Last supported entry maps to hardware 17, not its compact dropdown index.
+                    key("End", "Up", "Return")
+                else:
+                    key("Home", "Down", "Down", "Return")
                 # Only the board crop should animate; staging must not invoke hardware writes.
                 def board_pixels():
                     return subprocess.check_output(["import", "-window", window, "-crop", "980x290+40+180", "rgb:-"])
@@ -204,7 +213,7 @@ def main():
                 capture("gui-lighting-preview.png")
                 click(985, 860)
                 wait_calls("apply-state", 1)
-                assert json.loads((folder / "state.json").read_text())["leds"][10] == 2
+                assert json.loads((folder / "state.json").read_text())["leds"][10] == (17 if standard else 2)
                 click(700, 860)
                 wait_calls("apply-state", 2)
                 assert json.loads((folder / "state.json").read_text()) == original

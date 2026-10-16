@@ -33,6 +33,7 @@ pub struct Editor {
     selected: Cell<u8>,
     controls_for: Cell<(u8, u8)>,
     content: gtk::Box,
+    device_name: gtk::Label,
     status: gtk::Label,
     connection: gtk::Label,
     pending: gtk::Label,
@@ -106,20 +107,16 @@ impl Editor {
             t("Arco-íris", "Rainbow"),
             t("Disparo", "Trigger"),
             t("Chuva", "Rain"),
-            t("Roda arco-íris", "Rainbow wheel"),
             t("Ondas", "Waves"),
             t("Estrelas", "Stars"),
-            t("Rastro", "Trail"),
             t("Fluxo", "Flow"),
             t("Corrente neon", "Neon stream"),
             t("Reação", "Reactive"),
             t("Senoide", "Sine wave"),
-            t("Varredura", "Sweep"),
             t("Moinho", "Windmill"),
             t("Cascata", "Cascade"),
             t("Florescer", "Blossom"),
-            t("Tempestade", "Storm"),
-            t("Personalizado / outro", "Custom / other"),
+            t("Personalizado / indisponível", "Custom / unavailable"),
         ];
         let editor = Rc::new(Self {
             root: gtk::Box::new(gtk::Orientation::Vertical, 0),
@@ -138,6 +135,7 @@ impl Editor {
             selected: Cell::new(50),
             controls_for: Cell::new((255, 255)),
             content: gtk::Box::new(gtk::Orientation::Vertical, 12),
+            device_name: text("AULA F87 / F87 Pro", "device-title"),
             status: text(
                 t(
                     "Conecte o teclado pelo cabo USB.",
@@ -220,7 +218,7 @@ impl Editor {
         let heading = gtk::Box::new(gtk::Orientation::Horizontal, 16);
         let titles = gtk::Box::new(gtk::Orientation::Vertical, 4);
         titles.set_hexpand(true);
-        titles.append(&text("AULA F87 Pro", "device-title"));
+        titles.append(&self.device_name);
         titles.append(&self.connection);
         heading.append(&titles);
         heading.append(&self.spinner);
@@ -554,14 +552,13 @@ impl Editor {
         if self.syncing.get() {
             return;
         }
-        let effect = self.effect.selected() as u8;
+        let Some(&effect) = aula_f87pro::LED_EFFECTS.get(self.effect.selected() as usize) else {
+            return;
+        };
         let mut session = self.session.borrow_mut();
         let Some(draft) = &mut session.draft else {
             return;
         };
-        if effect > 18 {
-            return;
-        }
         let original: &[u8; 128] = draft.leds.as_slice().try_into().expect("validated LEDs");
         let changed = if effect_changed {
             aula_f87pro::led_effect(original, effect)
@@ -596,7 +593,9 @@ impl Editor {
         let dirty = session.dirty();
         let unprepared = self.has_unprepared();
         let compatible = match (&session.baseline, &session.draft) {
-            (Some(current), Some(draft)) => current.version == draft.version,
+            (Some(current), Some(draft)) => {
+                current.version == draft.version && current.identity == draft.identity
+            }
             _ => true,
         };
         let enabled = session.connected && !self.busy.get();
@@ -611,13 +610,28 @@ impl Editor {
                     .undo
                     .as_ref()
                     .zip(session.baseline.as_ref())
-                    .is_some_and(|(undo, current)| undo.version == current.version),
+                    .is_some_and(|(undo, current)| {
+                        undo.version == current.version && undo.identity == current.identity
+                    }),
         );
         self.discard
             .set_sensitive(enabled && (dirty || session.conflict || unprepared));
         self.reload.set_sensitive(!self.busy.get());
         self.content.set_sensitive(!self.busy.get());
-        self.pending.set_text(if session.conflict {
+        self.device_name.set_text(
+            session
+                .baseline
+                .as_ref()
+                .or(session.draft.as_ref())
+                .and_then(|state| aula_f87pro::Model::from_identity(&state.identity))
+                .map_or("AULA F87 / F87 Pro", |model| model.name()),
+        );
+        self.pending.set_text(if !compatible {
+            t(
+                "Perfil de outro modelo ou conexão — recarregue ou descarte",
+                "Profile from another model or connection — reload or discard",
+            )
+        } else if session.conflict {
             t(
                 "Conflito — salve o perfil ou recarregue",
                 "Conflict — save a profile or reload",
@@ -664,8 +678,8 @@ impl Editor {
                 self.layer.set_selected(selected);
             }
             self.lighting.set(Lighting::read(&draft.leds));
-            self.preview_caption.set_text(if draft.leds[9] != 0 || draft.leds[10] > 18 {
-                t("Prévia indisponível para iluminação personalizada. Clique numa tecla para editar.", "Preview unavailable for custom lighting. Click a key to edit its assignment.")
+            self.preview_caption.set_text(if draft.leds[9] != 0 || !aula_f87pro::LED_EFFECTS.contains(&draft.leds[10]) {
+                t("Prévia indisponível para este efeito. Escolha um efeito disponível para alterar a iluminação.", "Preview unavailable for this effect. Choose an available effect to change lighting.")
             } else if !session.connected {
                 t("Prévia ilustrativa · configuração local · teclado desconectado.", "Illustrative preview · local configuration · keyboard disconnected.")
             } else if session.baseline.as_ref().is_some_and(|s| s.leds != draft.leds) {
@@ -673,13 +687,13 @@ impl Editor {
             } else {
                 t("Prévia ilustrativa · configuração lida do teclado, sem sincronia dos LEDs.", "Illustrative preview · configuration read from keyboard, LEDs not synchronized.")
             });
-            let effect = if draft.leds[9] != 0 || draft.leds[10] > 18 {
-                19
-            } else {
-                draft.leds[10] as u32
-            };
-            self.effect.set_selected(effect);
-            let adjustable = (1..=18).contains(&effect);
+            let effect = draft.leds[10];
+            let selected = (draft.leds[9] == 0)
+                .then(|| aula_f87pro::LED_EFFECTS.iter().position(|&id| id == effect))
+                .flatten();
+            self.effect
+                .set_selected(selected.unwrap_or(aula_f87pro::LED_EFFECTS.len()) as u32);
+            let adjustable = selected.is_some() && effect != 0;
             for widget in [
                 self.brightness.upcast_ref::<gtk::Widget>(),
                 self.speed.upcast_ref(),
@@ -1185,6 +1199,9 @@ impl Editor {
                         if let Ok(state) = state::decode(&bytes) { return Ok(profiles::Profile { name: "Backup F87 Pro".into(), state }); }
                         let mut state = e.session.borrow().draft.clone().ok_or_else(|| std::io::Error::other(t("Leia o teclado antes de importar um backup antigo.", "Read the keyboard before importing a legacy backup.")))?;
                         let (layer, payload) = state::legacy_backup(&bytes, bytes.len() != 134)?;
+                        if bytes[..6] != state.identity {
+                            return Err(std::io::Error::other(t("Este backup pertence a outro modelo de teclado.", "This backup belongs to another keyboard model.")));
+                        }
                         if let Some(index) = layer {
                             let layer = state.layers.get_mut(index as usize).filter(|layer| layer.len() == payload.len())
                                 .ok_or_else(|| std::io::Error::other(t("A camada ou o transporte do backup difere da conexão atual.", "The backup's layer or transport differs from the current connection.")))?;

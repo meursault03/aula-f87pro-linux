@@ -7,6 +7,33 @@ pub mod state;
 pub mod wireless;
 pub use keys::KEYS;
 
+// Both original profiles use LedMask=0x22120: hide effects 6, 9, 14 and 18.
+pub const LED_EFFECTS: &[u8] = &[0, 1, 2, 3, 4, 5, 7, 8, 10, 11, 12, 13, 15, 16, 17];
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Model {
+    F87,
+    F87Pro,
+}
+
+impl Model {
+    pub fn from_identity(identity: &[u8]) -> Option<Self> {
+        // Psd from the original suite's Dev/kb/1 and Dev/kb/F87PRO profiles.
+        match identity {
+            [3, 0, 0, 0, 0, 0x8f] => Some(Self::F87),
+            [3, 0, 0, 0, 1, 0x0b] => Some(Self::F87Pro),
+            _ => None,
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::F87 => "AULA F87",
+            Self::F87Pro => "AULA F87 Pro",
+        }
+    }
+}
+
 pub fn macro_request(operation: u8, chunk: u8) -> io::Result<[u8; 520]> {
     if !matches!(operation, 5 | 0x85) || chunk >= 8 {
         return Err(io::Error::new(
@@ -69,12 +96,12 @@ pub fn response_payload(report: &[u8], length: u16) -> io::Result<Vec<u8>> {
 pub fn led_effect(original: &[u8; 128], effect: u8) -> io::Result<[u8; 128]> {
     // KB.ini LedOpt first field -> config[10], per parser 0x410840 and FillLED 0x48abf0.
     let hardware = match effect {
-        1..=18 => effect,
         0 | 21 => 0,
+        effect if LED_EFFECTS.contains(&effect) => effect,
         _ => {
             return Err(io::Error::new(
                 ErrorKind::InvalidInput,
-                "supported LED effects: 0 (off), 1..18",
+                "supported LED effects: 0 (off), 1..5, 7, 8, 10..13, 15..17; the original app hides 6, 9, 14, 18",
             ));
         }
     };
@@ -282,13 +309,32 @@ mod tests {
         }
         assert_eq!(led_effect(original, 12).unwrap()[10], original[10]);
         assert_eq!(led_effect(original, 13).unwrap()[10], 13);
-        assert_eq!(led_effect(original, 18).unwrap()[10], 18);
+        assert_eq!(led_effect(original, 17).unwrap()[10], 17);
         assert_eq!(led_effect(original, 21).unwrap()[10], 0);
         assert!(led_effect(original, 19).is_err());
         let frame = write_led_request(&changed);
         assert_eq!(&frame[..8], &[6, 4, 0, 0, 1, 0, 128, 0]);
         assert_eq!(&frame[8..136], &changed);
         assert!(frame[136..].iter().all(|b| *b == 0));
+    }
+
+    #[test]
+    fn rejects_effects_hidden_by_original_f87_led_mask() {
+        let original = include_bytes!("../tests/fixtures/f87pro-led-read.bin");
+        // Both device profiles declare LedMask=0x22120; the original menu omits these bits.
+        for effect in [6, 9, 14, 18] {
+            assert!(
+                led_effect(original, effect).is_err(),
+                "masked effect {effect}"
+            );
+            assert!(led_settings(original, effect, 4, 3, 7).is_err());
+        }
+        for effect in 1..=18 {
+            assert_eq!(
+                led_effect(original, effect).is_ok(),
+                0x22120 & (1 << (effect - 1)) == 0
+            );
+        }
     }
 
     #[test]

@@ -81,7 +81,7 @@ impl Settings {
             tap: gtk::CheckButton::with_mnemonic(t("_Ativar Tap", "_Enable Tap")),
             sensitivity: gtk::Scale::with_range(gtk::Orientation::Horizontal, 10.0, 127.0, 1.0),
         });
-        let info = section(t("Dispositivo", "Device"), "AULA F87 Pro");
+        let info = section(t("Dispositivo", "Device"), "AULA F87 / F87 Pro");
         row(
             &info,
             t(

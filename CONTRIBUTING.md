@@ -42,6 +42,8 @@ xvfb-run -a -s '-screen 0 1440x1600x24' env -u WAYLAND_DISPLAY GTK_THEME=Adwaita
 ```
 
 `F87_TEST_ENGLISH=1` tests the English interface.
+`F87_TEST_STANDARD=1` tests the standard F87 USB identity with synthetic shared-layout
+data. It is not a hardware capture or proof of physical F87 behavior.
 `F87_TEST_REDUCED_MOTION=1` checks that the preview stays still. These tests use
 isolated demonstration state and a simulated CLI: **they never write to HID**.
 
@@ -55,7 +57,7 @@ It publishes a prerelease only after all jobs pass. Tags must match Cargo's vers
 python3 scripts/package.py --format tar
 # Needs dpkg-deb and readelf; use Ubuntu 24.04 for distributable Debian binaries.
 python3 scripts/package.py --format deb
-python3 scripts/package.py --arch-recipe dist/aula-f87pro-0.2.0-linux-x86_64.tar.gz
+python3 scripts/package.py --arch-recipe dist/aula-f87pro-0.3.0-linux-x86_64.tar.gz
 ```
 
 The generated `PKGBUILD` verifies the exact release archive by SHA-256. On Arch,
@@ -75,5 +77,5 @@ Private research notes, proprietary installers, firmware, machine captures and
 personal profiles do not belong in a pull request. Tests contain only the small
 reference payloads documented in [tests/fixtures/README.md](tests/fixtures/README.md).
 
-Open an issue before adding other devices or firmware flashing. This project is
-currently dedicated to the AULA F87 Pro.
+The current scope is the AULA F87 Pro and experimental standard F87 USB support
+(issue #1). Open an issue before adding other devices or firmware flashing.

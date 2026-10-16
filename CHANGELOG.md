@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.0 — 2026-10-16
+
+- Honor the original suite's LedMask for both F87 profiles. Hide Rainbow wheel
+  (6), Trail (9), Sweep (14) and Storm (18), which were incorrectly offered.
+  The selector now maps its 14 available effects to their original hardware IDs.
+  CLI, profile application and RGB-only loading reject unavailable normal effects;
+  reading and backing up existing device state still preserve unknown fields.
+
+- Experimental AULA F87 standard support over USB, using its identity and shared
+  protocol recovered from the original Windows suite. The detected model appears
+  in the interface; existing F87 Pro profiles and storage paths remain compatible.
+- Reject applying full profiles, RGB-only imports and legacy backups from another model.
+- F87 standard hardware effects still need physical validation. The suite declares
+  the same effect table as the Pro; this does not establish the cause of issue #1.
+- F87 standard radio configuration remains unavailable.
+
 ## 0.2.0 — 2026-10-16
 
 - Portuguese and English interfaces, with separate screenshots in each README.
