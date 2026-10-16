@@ -32,13 +32,17 @@ fn row(parent: &gtk::Box, title: &str, description: &str, control: &impl IsA<gtk
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 24);
     let labels = gtk::Box::new(gtk::Orientation::Vertical, 4);
     labels.set_hexpand(true);
-    let label = text(title, "setting-label");
+    let label = gtk::Label::with_mnemonic(title);
+    label.set_xalign(0.0);
+    label.set_wrap(true);
+    label.add_css_class("setting-label");
+    label.set_mnemonic_widget(Some(control));
     labels.append(&label);
     labels.append(&text(description, "muted"));
     control.set_valign(gtk::Align::Center);
     control
         .as_ref()
-        .update_property(&[gtk::accessible::Property::Label(title)]);
+        .update_property(&[gtk::accessible::Property::Label(&title.replace('_', ""))]);
     row.append(&labels);
     row.append(control);
     parent.append(&row);
@@ -74,7 +78,7 @@ impl Settings {
             sleep: gtk::DropDown::from_strings(
                 &sleep_labels.iter().map(String::as_str).collect::<Vec<_>>(),
             ),
-            tap: gtk::CheckButton::with_label(t("Ativar Tap", "Enable Tap")),
+            tap: gtk::CheckButton::with_mnemonic(t("_Ativar Tap", "_Enable Tap")),
             sensitivity: gtk::Scale::with_range(gtk::Orientation::Horizontal, 10.0, 127.0, 1.0),
         });
         let info = section(t("Dispositivo", "Device"), "AULA F87 Pro");
@@ -101,7 +105,7 @@ impl Settings {
 
         row(
             &settings.device,
-            "Debounce",
+            "_Debounce",
             t(
                 "Cinco estágios, como no driver original. Não representam milissegundos confirmados.",
                 "Five stages, as in the original driver. These are not verified millisecond values.",
@@ -110,7 +114,7 @@ impl Settings {
         );
         row(
             &settings.device,
-            t("Suspensão por inatividade", "Idle sleep"),
+            t("_Suspensão por inatividade", "_Idle sleep"),
             t(
                 "Tempo configurado para o teclado entrar em suspensão.",
                 "Configured timeout before the keyboard enters sleep.",
@@ -194,7 +198,7 @@ impl Settings {
         language.set_selected(u32::from(prefs.english));
         row(
             &page,
-            t("Idioma", "Language"),
+            t("_Idioma", "_Language"),
             t(
                 "A mudança de idioma entra em vigor ao reabrir o aplicativo.",
                 "The language change takes effect when you reopen the application.",
@@ -217,7 +221,7 @@ impl Settings {
         autostart.set_active(app_settings::autostart_enabled(&config));
         row(
             &page,
-            t("Iniciar ao entrar na sessão", "Start at login"),
+            t("I_niciar ao entrar na sessão", "_Start at login"),
             t(
                 "Abre o configurador ao iniciar sua sessão gráfica do Linux.",
                 "Opens the configurator when your Linux desktop session starts.",
@@ -252,7 +256,7 @@ impl Settings {
         close.set_selected(u32::from(prefs.minimize_on_close));
         row(
             &page,
-            t("Ao fechar a janela", "When closing the window"),
+            t("Ao _fechar a janela", "When _closing the window"),
             t(
                 "Ao minimizar, a janela permanece na barra de tarefas. Para sair, use Encerrar aplicativo no menu superior.",
                 "When minimized, the window stays in the taskbar. To exit, use Quit application in the top menu.",

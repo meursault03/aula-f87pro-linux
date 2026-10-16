@@ -129,11 +129,16 @@ def main():
                     key("ctrl+5")
                     subprocess.run(["xdotool", "windowsize", window, "1080", "1400"], check=True)
                     time.sleep(.3)
-                    click(975, 524)
+                    capture("gui-settings-before-edit.png")
+                    key("alt+d")
+                    key("space")
                     key("Home", "Down", "Down", "Down", "Return")
-                    click(975, 576)
+                    key("Escape")
+                    key("alt+i" if english else "alt+s")
+                    key("space")
                     key("Home", *(["Down"] * 7), "Return")
-                    click(845, 620)
+                    key("Escape")
+                    key("alt+e" if english else "alt+a")
                     before = [json.loads(line) for line in (folder / "calls.jsonl").read_text().splitlines()]
                     assert sum(call[0] == "apply-state" for call in before) == previous_calls, "Settings wrote before Apply"
                     subprocess.run(["xdotool", "windowsize", window, "1080", "900"], check=True)
@@ -141,6 +146,7 @@ def main():
                     click(985, 860)
                     wait_calls("apply-state", previous_calls + 1)
                     changed = json.loads((folder / "state.json").read_text())
+                    capture("gui-settings-after-apply.png")
                     assert [changed["leds"][i] for i in (3,22,24)] == [3,127,10], changed["leds"]
                     for i in range(128):
                         if i not in (3,22,24): assert changed["leds"][i] == original["leds"][i], i
@@ -151,16 +157,22 @@ def main():
                     capture("gui-settings.png")
                     subprocess.run(["xdotool", "windowsize", window, "1080", "1400"], check=True)
                     time.sleep(.3)
-                    click(1000, 945)
+                    key("alt+s" if english else "alt+n")
                     autostart = folder / "config/autostart/io.github.aula_f87pro.Control.desktop"
+                    if not autostart.exists(): key("space")
                     assert autostart.exists(), "Start at login was not saved"
-                    click(1000, 945)
+                    key("alt+s" if english else "alt+n")
+                    if autostart.exists(): key("space")
                     assert not autostart.exists(), "Start at login was not disabled"
-                    click(970, 996)
+                    key("alt+c" if english else "alt+f")
+                    key("space")
                     key("End", "Return")
+                    key("Escape")
                     assert json.loads(preference_file.read_text())["minimize_on_close"]
-                    click(970, 896)
+                    key("alt+l" if english else "alt+i")
+                    key("space")
                     key("Home" if english else "End", "Return")
+                    key("Escape")
                     assert json.loads(preference_file.read_text())["english"] != english
                     click(1055, 27)
                     assert app.poll() is None, "Closing in minimize mode quit the application"
