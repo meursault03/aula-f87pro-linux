@@ -1,3 +1,4 @@
+use super::i18n::{t, tf};
 use super::lighting_preview::Lighting;
 use super::{assignments, keyboard, profiles, session::Session};
 use aula_f87pro::{
@@ -25,6 +26,8 @@ pub struct Editor {
     pub window: gtk::ApplicationWindow,
     pub session: RefCell<Session>,
     pub busy: Cell<bool>,
+    pub preferences: Rc<RefCell<super::app_settings::Preferences>>,
+    settings: RefCell<Option<Rc<super::settings_ui::Settings>>>,
     transport: Cell<Option<aula_f87pro::discovery::Transport>>,
     syncing: Cell<bool>,
     selected: Cell<u8>,
@@ -97,68 +100,90 @@ fn scale() -> gtk::Scale {
 impl Editor {
     pub fn new(window: &gtk::ApplicationWindow) -> Rc<Self> {
         let effects = [
-            "Desligado",
-            "Fixo",
-            "Respiração",
-            "Arco-íris",
-            "Disparo",
-            "Chuva",
-            "Roda arco-íris",
-            "Ondas",
-            "Estrelas",
-            "Rastro",
-            "Fluxo",
-            "Corrente neon",
-            "Reação",
-            "Senoide",
-            "Varredura",
-            "Moinho",
-            "Cascata",
-            "Florescer",
-            "Tempestade",
-            "Personalizado / outro",
+            t("Desligado", "Off"),
+            t("Fixo", "Static"),
+            t("Respiração", "Breathing"),
+            t("Arco-íris", "Rainbow"),
+            t("Disparo", "Trigger"),
+            t("Chuva", "Rain"),
+            t("Roda arco-íris", "Rainbow wheel"),
+            t("Ondas", "Waves"),
+            t("Estrelas", "Stars"),
+            t("Rastro", "Trail"),
+            t("Fluxo", "Flow"),
+            t("Corrente neon", "Neon stream"),
+            t("Reação", "Reactive"),
+            t("Senoide", "Sine wave"),
+            t("Varredura", "Sweep"),
+            t("Moinho", "Windmill"),
+            t("Cascata", "Cascade"),
+            t("Florescer", "Blossom"),
+            t("Tempestade", "Storm"),
+            t("Personalizado / outro", "Custom / other"),
         ];
         let editor = Rc::new(Self {
             root: gtk::Box::new(gtk::Orientation::Vertical, 0),
             window: window.clone(),
             session: RefCell::new(Session::default()),
             busy: Cell::new(false),
+            preferences: Rc::new(RefCell::new(
+                super::app_settings::Preferences::load(
+                    &glib::user_config_dir().join("aula-f87pro/settings.json"),
+                )
+                .unwrap_or_default(),
+            )),
+            settings: RefCell::new(None),
             transport: Cell::new(None),
             syncing: Cell::new(false),
             selected: Cell::new(50),
             controls_for: Cell::new((255, 255)),
             content: gtk::Box::new(gtk::Orientation::Vertical, 12),
-            status: text("Conecte o teclado pelo cabo USB.", "status"),
-            connection: text("Procurando teclado…", "connection"),
-            pending: text("Nenhuma alteração pendente", "muted"),
+            status: text(
+                t(
+                    "Conecte o teclado pelo cabo USB.",
+                    "Connect the keyboard using its USB cable.",
+                ),
+                "status",
+            ),
+            connection: text(
+                t("Procurando teclado…", "Looking for keyboard…"),
+                "connection",
+            ),
+            pending: text(
+                t("Nenhuma alteração pendente", "No pending changes"),
+                "muted",
+            ),
             details: gtk::TextBuffer::new(None),
             spinner: gtk::Spinner::new(),
-            apply: gtk::Button::with_label("Aplicar alterações"),
-            undo: gtk::Button::with_label("Desfazer última alteração"),
-            discard: gtk::Button::with_label("Descartar edições"),
-            reload: gtk::Button::with_label("Recarregar teclado"),
-            layer: gtk::DropDown::from_strings(&["0 — principal", "1", "2", "3"]),
-            key_name: text("Tecla A", "section-title"),
-            key_current: text("Atual no teclado: —", "muted"),
+            apply: gtk::Button::with_label(t("Aplicar alterações", "Apply changes")),
+            undo: gtk::Button::with_label(t("Desfazer última alteração", "Undo last change")),
+            discard: gtk::Button::with_label(t("Descartar edições", "Discard edits")),
+            reload: gtk::Button::with_label(t("Recarregar teclado", "Reload keyboard")),
+            layer: gtk::DropDown::from_strings(&[t("0 — principal", "0 — main"), "1", "2", "3"]),
+            key_name: text(t("Tecla A", "Key A"), "section-title"),
+            key_current: text(t("Atual no teclado: —", "Current on keyboard: —"), "muted"),
             key_draft: text("", "pending-text"),
             effect: gtk::DropDown::from_strings(&effects),
             brightness: scale(),
             speed: scale(),
             palette: gtk::DropDown::from_strings(&[
-                "Vermelho",
-                "Verde",
-                "Azul",
-                "Amarelo",
+                t("Vermelho", "Red"),
+                t("Verde", "Green"),
+                t("Azul", "Blue"),
+                t("Amarelo", "Yellow"),
                 "Magenta",
-                "Ciano",
-                "Branco",
-                "Multicolorido",
+                t("Ciano", "Cyan"),
+                t("Branco", "White"),
+                t("Multicolorido", "Multicolor"),
             ]),
             kind: gtk::DropDown::from_strings(&[
-                "Tecla ou atalho",
-                "Multimídia",
-                "Copiar função de outra tecla",
-                "Desativar",
+                t("Tecla ou atalho", "Key or shortcut"),
+                t("Multimídia", "Media"),
+                t(
+                    "Copiar função de outra tecla",
+                    "Copy another key's function",
+                ),
+                t("Desativar", "Disable"),
             ]),
             function: gtk::DropDown::from_strings(&[]),
             modifiers: ["Ctrl", "Shift", "Alt", "Super"]
@@ -169,13 +194,16 @@ impl Editor {
             lighting: Rc::new(Cell::new(None)),
             animate: Rc::new(Cell::new(true)),
             preview_caption: text(
-                "Prévia ilustrativa dos LEDs · aguardando configuração.",
+                t(
+                    "Prévia ilustrativa dos LEDs · aguardando configuração.",
+                    "Illustrative LED preview · waiting for configuration.",
+                ),
                 "board-caption",
             ),
             pages: gtk::Stack::new(),
             profile: gtk::DropDown::from_strings(&[]),
             profile_name: gtk::Entry::builder()
-                .placeholder_text("Ex.: Trabalho, Jogos…")
+                .placeholder_text(t("Ex.: Trabalho, Jogos…", "E.g. Work, Games…"))
                 .max_length(80)
                 .build(),
             profile_entries: RefCell::new(Vec::new()),
@@ -196,11 +224,12 @@ impl Editor {
         titles.append(&self.connection);
         heading.append(&titles);
         heading.append(&self.spinner);
-        let motion = gtk::CheckButton::with_mnemonic("_Animar prévia");
+        let motion = gtk::CheckButton::with_mnemonic(t("_Animar prévia", "_Animate preview"));
         motion.set_active(true);
-        motion.set_tooltip_text(Some(
+        motion.set_tooltip_text(Some(t(
             "Anima apenas a representação na tela, sem alterar os LEDs do teclado.",
-        ));
+            "Animates the on-screen preview without changing the keyboard's LEDs.",
+        )));
         let animate = self.animate.clone();
         motion.connect_toggled(move |toggle| animate.set(toggle.is_active()));
         heading.append(&motion);
@@ -256,6 +285,35 @@ impl Editor {
             .add_titled(&macro_editor.widget, Some("macros"), "Macros");
         self.macro_editor.replace(Some(macro_editor));
         self.build_profiles();
+        let settings = super::settings_ui::Settings::new(self);
+        self.pages.add_titled(
+            &settings.widget,
+            Some("settings"),
+            t("Configurações", "Settings"),
+        );
+        self.settings.replace(Some(settings));
+        for (index, page) in ["lights", "keys", "macros", "profiles", "settings"]
+            .iter()
+            .enumerate()
+        {
+            let name = format!("page-{page}");
+            let action = gio::SimpleAction::new(&name, None);
+            let stack = self.pages.downgrade();
+            let page = *page;
+            action.connect_activate(move |_, _| {
+                if let Some(stack) = stack.upgrade() {
+                    stack.set_visible_child_name(page);
+                }
+            });
+            self.window.add_action(&action);
+            if let Some(app) = self.window.application() {
+                app.set_accels_for_action(
+                    &format!("win.{name}"),
+                    &[&format!("<Primary>{}", index + 1)],
+                );
+            }
+        }
+
         self.content.append(&self.pages);
         let view = gtk::TextView::with_buffer(&self.details);
         view.set_editable(false);
@@ -267,7 +325,7 @@ impl Editor {
             .max_content_height(140)
             .build();
         let expander = gtk::Expander::builder()
-            .label("Detalhes da última operação")
+            .label(t("Detalhes da última operação", "Last operation details"))
             .child(&scroll)
             .build();
         self.content.append(&expander);
@@ -310,11 +368,17 @@ impl Editor {
 
     fn build_lights(self: &Rc<Self>) {
         let lights = section(
-            "Iluminação",
-            "Efeito e parâmetros lidos do teclado. As edições ficam pendentes até aplicar.",
+            t("Iluminação", "Lighting"),
+            t(
+                "Efeito e parâmetros lidos do teclado. As edições ficam pendentes até aplicar.",
+                "Effect and parameters read from the keyboard. Edits remain pending until you apply them.",
+            ),
         );
         let selectors = gtk::Box::new(gtk::Orientation::Horizontal, 24);
-        for (title, dropdown) in [("_Efeito", &self.effect), ("_Cor do efeito", &self.palette)] {
+        for (title, dropdown) in [
+            (t("_Efeito", "_Effect"), &self.effect),
+            (t("_Cor do efeito", "Effect _color"), &self.palette),
+        ] {
             let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
             column.set_hexpand(true);
             field(&column, title, dropdown);
@@ -322,7 +386,10 @@ impl Editor {
         }
         lights.append(&selectors);
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 24);
-        for (title, scale) in [("_Brilho", &self.brightness), ("_Velocidade", &self.speed)] {
+        for (title, scale) in [
+            (t("_Brilho", "_Brightness"), &self.brightness),
+            (t("_Velocidade", "_Speed"), &self.speed),
+        ] {
             let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
             column.set_hexpand(true);
             field(&column, title, scale);
@@ -330,7 +397,10 @@ impl Editor {
         }
         lights.append(&row);
         lights.append(&text(
-            "Os parâmetros são salvos por efeito. Nem todo efeito utiliza cor ou velocidade.",
+            t(
+                "Os parâmetros são salvos por efeito. Nem todo efeito utiliza cor ou velocidade.",
+                "Parameters are saved per effect. Some effects do not use color or speed.",
+            ),
             "muted",
         ));
         let e = self.clone();
@@ -345,13 +415,17 @@ impl Editor {
         let e = self.clone();
         self.palette
             .connect_selected_notify(move |_| e.edit_lights(false));
-        self.pages.add_titled(&lights, Some("lights"), "Iluminação");
+        self.pages
+            .add_titled(&lights, Some("lights"), t("Iluminação", "Lighting"));
     }
 
     fn build_keys(self: &Rc<Self>) {
         let keys = section(
-            "Atribuições",
-            "Prepare quantas teclas quiser; todas as alterações serão aplicadas juntas.",
+            t("Atribuições", "Key assignments"),
+            t(
+                "Prepare quantas teclas quiser; todas as alterações serão aplicadas juntas.",
+                "Prepare as many keys as you like; all changes will be applied together.",
+            ),
         );
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 20);
         self.key_name.set_hexpand(true);
@@ -363,10 +437,10 @@ impl Editor {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 16);
         let kind = gtk::Box::new(gtk::Orientation::Vertical, 6);
         kind.set_hexpand(true);
-        field(&kind, "_Tipo de função", &self.kind);
+        field(&kind, t("_Tipo de função", "Function _type"), &self.kind);
         let value = gtk::Box::new(gtk::Orientation::Vertical, 6);
         value.set_hexpand(true);
-        field(&value, "_Função", &self.function);
+        field(&value, t("_Função", "_Function"), &self.function);
         row.append(&kind);
         row.append(&value);
         keys.append(&row);
@@ -375,7 +449,7 @@ impl Editor {
             modifiers.append(modifier);
         }
         keys.append(&modifiers);
-        let prepare = gtk::Button::with_label("Preparar atribuição");
+        let prepare = gtk::Button::with_label(t("Preparar atribuição", "Prepare assignment"));
         prepare.set_halign(gtk::Align::End);
         keys.append(&prepare);
         let e = self.clone();
@@ -383,7 +457,8 @@ impl Editor {
             .connect_selected_notify(move |_| e.update_functions());
         let e = self.clone();
         prepare.connect_clicked(move |_| e.stage_assignment());
-        self.pages.add_titled(&keys, Some("keys"), "Teclas");
+        self.pages
+            .add_titled(&keys, Some("keys"), t("Teclas", "Keys"));
         self.update_functions();
     }
 
@@ -393,9 +468,9 @@ impl Editor {
                 .iter()
                 .map(|(name, _)| *name)
                 .collect(),
-            1 => assignments::MEDIA.iter().map(|(name, _)| *name).collect(),
+            1 => assignments::media().iter().map(|(name, _)| *name).collect(),
             2 => KEYS.iter().map(|(name, _)| *name).collect(),
-            _ => vec!["Sem função"],
+            _ => vec![t("Sem função", "No function")],
         };
         self.function.set_model(Some(&gtk::StringList::new(&names)));
         self.function.set_selected(0);
@@ -423,7 +498,7 @@ impl Editor {
                 }
                 code
             }),
-            1 => assignments::MEDIA.get(index).map(|(_, code)| *code),
+            1 => assignments::media().get(index).map(|(_, code)| *code),
             2 => draft.key_code(layer, (index + 1) as u8).ok(),
             _ => Some([0; 4]),
         };
@@ -431,8 +506,10 @@ impl Editor {
             let _ = draft.set_key_code(layer, self.selected.get(), code);
         }
         drop(session);
-        self.status
-            .set_text("Atribuição preparada. Clique em Aplicar alterações para gravar.");
+        self.status.set_text(t(
+            "Atribuição preparada. Clique em Aplicar alterações para gravar.",
+            "Assignment prepared. Click Apply changes to write it to the keyboard.",
+        ));
         self.refresh();
     }
 
@@ -441,7 +518,7 @@ impl Editor {
             self.kind.set_selected(3);
             return;
         }
-        if let Some(index) = assignments::MEDIA
+        if let Some(index) = assignments::media()
             .iter()
             .position(|(_, value)| *value == code)
         {
@@ -505,6 +582,10 @@ impl Editor {
     }
 
     pub fn refresh(&self) {
+        if let Some(settings) = self.settings.borrow().as_ref() {
+            let session = self.session.borrow();
+            settings.sync(session.draft.as_ref(), session.connected, self.busy.get());
+        }
         self.syncing.set(true);
         let session = self.session.borrow();
         let dirty = session.dirty();
@@ -532,26 +613,38 @@ impl Editor {
         self.reload.set_sensitive(!self.busy.get());
         self.content.set_sensitive(!self.busy.get());
         self.pending.set_text(if session.conflict {
-            "Conflito — salve o perfil ou recarregue"
+            t(
+                "Conflito — salve o perfil ou recarregue",
+                "Conflict — save a profile or reload",
+            )
         } else if dirty {
-            "Alterações ainda não aplicadas"
+            t("Alterações ainda não aplicadas", "Changes not yet applied")
         } else {
-            "Sincronizado com o teclado"
+            t("Sincronizado com o teclado", "Synced with keyboard")
         });
         if unprepared {
-            self.pending
-                .set_text("Prepare ou descarte a edição da macro");
+            self.pending.set_text(t(
+                "Prepare ou descarte a edição da macro",
+                "Prepare or discard the macro edit",
+            ));
         }
         if !compatible {
-            self.pending
-                .set_text("Este perfil usa outro transporte. Use a conexão em que ele foi salvo.");
+            self.pending.set_text(t(
+                "Este perfil usa outro transporte. Use a conexão em que ele foi salvo.",
+                "This profile uses a different transport. Use the connection it was saved with.",
+            ));
         }
         if !session.connected {
-            self.pending
-                .set_text("Desconectado · edições locais preservadas");
+            self.pending.set_text(t(
+                "Desconectado · edições locais preservadas",
+                "Disconnected · local edits preserved",
+            ));
         }
         if session.baseline.is_none() {
-            self.pending.set_text("Aguardando leitura do teclado");
+            self.pending.set_text(t(
+                "Aguardando leitura do teclado",
+                "Waiting to read keyboard",
+            ));
         }
         if let Some(draft) = &session.draft {
             if self
@@ -559,7 +652,7 @@ impl Editor {
                 .model()
                 .is_some_and(|model| model.n_items() != draft.layers.len() as u32)
             {
-                let labels = ["0 — principal", "1", "2", "3"];
+                let labels = [t("0 — principal", "0 — main"), "1", "2", "3"];
                 let selected = self.layer.selected().min(draft.layers.len() as u32 - 1);
                 self.layer
                     .set_model(Some(&gtk::StringList::new(&labels[..draft.layers.len()])));
@@ -567,13 +660,13 @@ impl Editor {
             }
             self.lighting.set(Lighting::read(&draft.leds));
             self.preview_caption.set_text(if draft.leds[9] != 0 || draft.leds[10] > 18 {
-                "Prévia indisponível para iluminação personalizada. Clique numa tecla para editar."
+                t("Prévia indisponível para iluminação personalizada. Clique numa tecla para editar.", "Preview unavailable for custom lighting. Click a key to edit its assignment.")
             } else if !session.connected {
-                "Prévia ilustrativa · configuração local · teclado desconectado."
+                t("Prévia ilustrativa · configuração local · teclado desconectado.", "Illustrative preview · local configuration · keyboard disconnected.")
             } else if session.baseline.as_ref().is_some_and(|s| s.leds != draft.leds) {
-                "Prévia ilustrativa · iluminação editada, ainda não aplicada."
+                t("Prévia ilustrativa · iluminação editada, ainda não aplicada.", "Illustrative preview · edited lighting, not yet applied.")
             } else {
-                "Prévia ilustrativa · configuração lida do teclado, sem sincronia dos LEDs."
+                t("Prévia ilustrativa · configuração lida do teclado, sem sincronia dos LEDs.", "Illustrative preview · configuration read from keyboard, LEDs not synchronized.")
             });
             let effect = if draft.leds[9] != 0 || draft.leds[10] > 18 {
                 19
@@ -601,8 +694,9 @@ impl Editor {
                 self.palette
                     .set_selected(u32::from(draft.leds[offset + 1] & 15).min(7));
             }
-            self.key_name.set_text(&format!(
+            self.key_name.set_text(&tf!(
                 "Tecla {}",
+                "Key {}",
                 KEYS[usize::from(self.selected.get()) - 1].0
             ));
             let layer = self.layer.selected() as u8;
@@ -617,8 +711,9 @@ impl Editor {
             {
                 self.sync_assignment(code);
             }
-            self.key_current.set_text(&format!(
+            self.key_current.set_text(&tf!(
                 "Atual no teclado: {}",
+                "Current on keyboard: {}",
                 current
                     .map(assignments::describe)
                     .unwrap_or_else(|| "—".into())
@@ -626,7 +721,7 @@ impl Editor {
             self.key_draft.set_text(
                 &prepared
                     .filter(|c| Some(*c) != current)
-                    .map(|c| format!("Preparado: {}", assignments::describe(c)))
+                    .map(|c| tf!("Preparado: {}", "Prepared: {}", assignments::describe(c)))
                     .unwrap_or_default(),
             );
             for (id, button) in self.keys.borrow().iter() {
@@ -645,7 +740,11 @@ impl Editor {
                     "{} · {}{}",
                     KEYS[usize::from(*id) - 1].0,
                     assignments::describe(code),
-                    if changed { " · pendente" } else { "" }
+                    if changed {
+                        t(" · pendente", " · pending")
+                    } else {
+                        ""
+                    }
                 )));
             }
         }
@@ -712,14 +811,19 @@ impl Editor {
 
     pub fn load(self: &Rc<Self>, discard: bool) {
         if self.has_unprepared() && !discard {
-            self.status
-                .set_text("Prepare ou descarte a edição da macro antes de recarregar.");
+            self.status.set_text(t(
+                "Prepare ou descarte a edição da macro antes de recarregar.",
+                "Prepare or discard the macro edit before reloading.",
+            ));
             return;
         }
         if discard && let Some(editor) = self.macro_editor.borrow().as_ref() {
             editor.discard();
         }
-        if !self.start("Lendo a configuração disponível nesta conexão…") {
+        if !self.start(t(
+            "Lendo a configuração disponível nesta conexão…",
+            "Reading configuration available through this connection…",
+        )) {
             return;
         }
         let editor = self.clone();
@@ -739,14 +843,14 @@ impl Editor {
                         editor.session.borrow_mut().undo = Some(undo);
                     }
                     editor.connection.set_text(if radio {
-                        "2,4 GHz conectado · iluminação e teclas disponíveis · macros preservadas"
+                        t("2,4 GHz conectado · iluminação e teclas disponíveis · macros preservadas", "2.4 GHz connected · lighting and keys available · macros preserved")
                     } else {
-                        "USB conectado · estado lido do teclado"
+                        t("USB conectado · estado lido do teclado", "USB connected · state read from keyboard")
                     });
                     editor.status.set_text(if editor.session.borrow().conflict {
-                        "O teclado mudou. Salve o perfil ou descarte as edições para recarregar."
+                        t("O teclado mudou. Salve o perfil ou descarte as edições para recarregar.", "The keyboard changed. Save a profile or discard your edits to reload.")
                     } else {
-                        "Leitura concluída. As alterações só serão gravadas ao aplicar."
+                        t("Leitura concluída. As alterações só serão gravadas ao aplicar.", "Read complete. Changes will only be written when you apply them.")
                     });
                 }
                 Err(error) => {
@@ -755,9 +859,9 @@ impl Editor {
                         if editor.transport.get()
                             == Some(aula_f87pro::discovery::Transport::Receiver24G)
                         {
-                            "Receptor detectado · teclado sem resposta ou leitura incompleta"
+                            t("Receptor detectado · teclado sem resposta ou leitura incompleta", "Receiver detected · keyboard not responding or read incomplete")
                         } else {
-                            "Teclado indisponível · verifique conexão e permissões"
+                            t("Teclado indisponível · verifique conexão e permissões", "Keyboard unavailable · check connection and permissions")
                         },
                     );
                     editor.error(error);
@@ -772,26 +876,38 @@ impl Editor {
         if transport.is_some() {
             self.connection.set_text(
                 if transport == Some(aula_f87pro::discovery::Transport::Receiver24G) {
-                    "Receptor 2,4 GHz detectado · consultando teclado…"
+                    t(
+                        "Receptor 2,4 GHz detectado · consultando teclado…",
+                        "2.4 GHz receiver detected · querying keyboard…",
+                    )
                 } else {
-                    "USB detectado · consultando teclado…"
+                    t(
+                        "USB detectado · consultando teclado…",
+                        "USB detected · querying keyboard…",
+                    )
                 },
             );
             self.load(false);
         } else {
             self.session.borrow_mut().connected = false;
-            self.connection
-                .set_text("Teclado não detectado · edições locais disponíveis");
-            self.status
-                .set_text("Teclado desconectado. Suas edições foram mantidas.");
+            self.connection.set_text(t(
+                "Teclado não detectado · edições locais disponíveis",
+                "Keyboard not detected · local edits available",
+            ));
+            self.status.set_text(t(
+                "Teclado desconectado. Suas edições foram mantidas.",
+                "Keyboard disconnected. Your edits have been preserved.",
+            ));
             self.refresh();
         }
     }
 
     fn apply_draft(self: &Rc<Self>, undoing: bool) {
         if self.has_unprepared() {
-            self.status
-                .set_text("Prepare ou descarte a edição da macro antes de aplicar.");
+            self.status.set_text(t(
+                "Prepare ou descarte a edição da macro antes de aplicar.",
+                "Prepare or discard the macro edit before applying changes.",
+            ));
             return;
         }
         let (desired, expected) = {
@@ -809,7 +925,10 @@ impl Editor {
             };
             (desired, expected)
         };
-        if !self.start("Salvando backup, aplicando e verificando no teclado…") {
+        if !self.start(t(
+            "Salvando backup, aplicando e verificando no teclado…",
+            "Saving backup, applying and verifying on the keyboard…",
+        )) {
             return;
         }
         let editor = self.clone();
@@ -829,9 +948,9 @@ impl Editor {
                     editor.session.borrow_mut().applied(applied.state, undoing);
                     let persistence = if undoing { match std::fs::remove_file(editor.data.join("undo.json")) { Ok(()) => Ok(()), Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()), Err(e) => Err(e) } }
                         else { expected.encode().and_then(|bytes| profiles::atomic_write(&editor.data.join("undo.json"), &bytes)) };
-                    let backup = applied.backup.unwrap_or_else(|| "Nenhuma gravação necessária.".into()); editor.details.set_text(&backup);
-                    editor.status.set_text(if !applied.changed { "O teclado já está com essa configuração." } else if undoing { "Última alteração desfeita e verificada no teclado." } else { "Alterações aplicadas e verificadas. Backup do estado acessível salvo." });
-                    if let Err(error) = persistence { editor.details.set_text(&format!("Backup: {backup}\nNão foi possível persistir o atalho Desfazer: {error}")); }
+                    let backup = applied.backup.unwrap_or_else(|| t("Nenhuma gravação necessária.", "No write needed.").into()); editor.details.set_text(&backup);
+                    editor.status.set_text(if !applied.changed { t("O teclado já está com essa configuração.", "The keyboard already has this configuration.") } else if undoing { t("Última alteração desfeita e verificada no teclado.", "Last change undone and verified on the keyboard.") } else { t("Alterações aplicadas e verificadas. Backup do estado acessível salvo.", "Changes applied and verified. Backup of the accessible state saved.") });
+                    if let Err(error) = persistence { editor.details.set_text(&tf!("Backup: {backup}\nNão foi possível persistir o atalho Desfazer: {error}", "Backup: {backup}\nCould not persist the Undo shortcut: {error}")); }
                 }
                 Err(error) => editor.error(error),
             }
@@ -841,17 +960,20 @@ impl Editor {
 
     fn build_profiles(self: &Rc<Self>) {
         let page = section(
-            "Perfis e recuperação",
-            "Salve a configuração disponível nesta conexão. Carregar prepara as edições; Aplicar grava no teclado.",
+            t("Perfis e recuperação", "Profiles and recovery"),
+            t(
+                "Salve a configuração disponível nesta conexão. Carregar prepara as edições; Aplicar grava no teclado.",
+                "Save the configuration available through this connection. Loading prepares edits; Apply writes them to the keyboard.",
+            ),
         );
-        field(&page, "_Perfil salvo", &self.profile);
+        field(&page, t("_Perfil salvo", "Saved _profile"), &self.profile);
         let actions = gtk::Box::new(gtk::Orientation::Horizontal, 10);
         for (name, action) in [
-            ("Carregar perfil", 0),
-            ("Importar perfil…", 1),
-            ("Exportar rascunho…", 2),
-            ("Carregar backup…", 3),
-            ("Carregar só RGB", 4),
+            (t("Carregar perfil", "Load profile"), 0),
+            (t("Importar perfil…", "Import profile…"), 1),
+            (t("Exportar rascunho…", "Export draft…"), 2),
+            (t("Carregar backup…", "Load backup…"), 3),
+            (t("Carregar só RGB", "Load RGB only"), 4),
         ] {
             let button = gtk::Button::with_label(name);
             let e = self.clone();
@@ -866,16 +988,22 @@ impl Editor {
         let save = gtk::Box::new(gtk::Orientation::Horizontal, 10);
         self.profile_name.set_hexpand(true);
         self.profile_name
-            .update_property(&[gtk::accessible::Property::Label("Nome do perfil")]);
+            .update_property(&[gtk::accessible::Property::Label(t(
+                "Nome do perfil",
+                "Profile name",
+            ))]);
         save.append(&self.profile_name);
-        let button = gtk::Button::with_label("Salvar perfil");
+        let button = gtk::Button::with_label(t("Salvar perfil", "Save profile"));
         let e = self.clone();
         button.connect_clicked(move |_| e.save_profile());
         save.append(&button);
         page.append(&save);
-        page.append(&text("Salvar um nome existente atualiza esse perfil. Perfis e backups ficam apenas neste computador.", "muted"));
-        self.pages
-            .add_titled(&page, Some("profiles"), "Perfis e backups");
+        page.append(&text(t("Salvar um nome existente atualiza esse perfil. Perfis e backups ficam apenas neste computador.", "Saving an existing name updates that profile. Profiles and backups stay on this computer."), "muted"));
+        self.pages.add_titled(
+            &page,
+            Some("profiles"),
+            t("Perfis e backups", "Profiles and backups"),
+        );
     }
 
     fn update_profiles(&self) {
@@ -883,8 +1011,10 @@ impl Editor {
             Ok(entries) => {
                 let names: Vec<_> = entries.iter().map(|(name, _)| name.as_str()).collect();
                 if entries.is_empty() {
-                    self.profile
-                        .set_model(Some(&gtk::StringList::new(&["Nenhum perfil salvo"])));
+                    self.profile.set_model(Some(&gtk::StringList::new(&[t(
+                        "Nenhum perfil salvo",
+                        "No saved profiles",
+                    )])));
                     self.profile.set_selected(0);
                     self.profile.set_sensitive(false);
                 } else {
@@ -905,8 +1035,10 @@ impl Editor {
 
     fn save_profile(&self) {
         if self.has_unprepared() {
-            self.status
-                .set_text("Prepare ou descarte a edição da macro antes de usar perfis.");
+            self.status.set_text(t(
+                "Prepare ou descarte a edição da macro antes de usar perfis.",
+                "Prepare or discard the macro edit before using profiles.",
+            ));
             return;
         }
         let session = self.session.borrow();
@@ -920,8 +1052,10 @@ impl Editor {
         ) {
             Ok(_) => {
                 self.update_profiles();
-                self.status
-                    .set_text("Perfil salvo neste computador. O teclado não foi alterado.");
+                self.status.set_text(t(
+                    "Perfil salvo neste computador. O teclado não foi alterado.",
+                    "Profile saved on this computer. The keyboard was not changed.",
+                ));
             }
             Err(error) => self.error(error),
         }
@@ -929,8 +1063,10 @@ impl Editor {
 
     fn load_profile(&self, lighting_only: bool) {
         if self.has_unprepared() {
-            self.status
-                .set_text("Prepare ou descarte a edição da macro antes de usar perfis.");
+            self.status.set_text(t(
+                "Prepare ou descarte a edição da macro antes de usar perfis.",
+                "Prepare or discard the macro edit before using profiles.",
+            ));
             return;
         }
         let path = self
@@ -939,8 +1075,10 @@ impl Editor {
             .get(self.profile.selected() as usize)
             .map(|(_, path)| path.clone());
         if path.is_none() {
-            self.status
-                .set_text("Salve ou importe um perfil antes de carregar.");
+            self.status.set_text(t(
+                "Salve ou importe um perfil antes de carregar.",
+                "Save or import a profile before loading.",
+            ));
         }
         if let Some(path) = path {
             match profiles::read(&path) {
@@ -952,9 +1090,10 @@ impl Editor {
                             .draft
                             .as_ref()
                             .ok_or_else(|| {
-                                std::io::Error::other(
+                                std::io::Error::other(t(
                                     "Leia o teclado antes de carregar a iluminação.",
-                                )
+                                    "Read the keyboard before loading lighting.",
+                                ))
                             })
                             .and_then(|draft| draft.with_lighting_from(&profile.state));
                         match result {
@@ -969,9 +1108,10 @@ impl Editor {
                     };
                     self.profile_name.set_text(&profile.name);
                     self.session.borrow_mut().draft = Some(state);
-                    self.status.set_text(
+                    self.status.set_text(t(
                         "Perfil carregado como rascunho. Revise e aplique quando quiser.",
-                    );
+                        "Profile loaded as a draft. Review and apply when ready.",
+                    ));
                     self.refresh();
                     if lighting_only {
                         self.pages.set_visible_child_name("lights");
@@ -984,31 +1124,34 @@ impl Editor {
 
     fn export_profile(self: &Rc<Self>) {
         if self.has_unprepared() {
-            self.status
-                .set_text("Prepare ou descarte a edição da macro antes de usar perfis.");
+            self.status.set_text(t(
+                "Prepare ou descarte a edição da macro antes de usar perfis.",
+                "Prepare or discard the macro edit before using profiles.",
+            ));
             return;
         }
         let Some(draft) = self.session.borrow().draft.clone() else {
             return;
         };
         let name = if self.profile_name.text().trim().is_empty() {
-            "Perfil F87 Pro".into()
+            t("Perfil F87 Pro", "F87 Pro profile").into()
         } else {
             self.profile_name.text().to_string()
         };
         let e = self.clone();
         glib::MainContext::default().spawn_local(async move {
             let dialog = gtk::FileDialog::builder()
-                .title("Exportar perfil F87 Pro")
-                .initial_name("perfil-f87pro.json")
+                .title(t("Exportar perfil F87 Pro", "Export F87 Pro profile"))
+                .initial_name(t("perfil-f87pro.json", "f87pro-profile.json"))
                 .build();
             match dialog.save_future(Some(&e.window)).await {
                 Ok(file) => {
                     if let Some(path) = file.path() {
                         match profiles::export(&path, &name, &draft) {
-                            Ok(()) => e.status.set_text(
+                            Ok(()) => e.status.set_text(t(
                                 "Perfil exportado. Nenhuma configuração foi gravada no teclado.",
-                            ),
+                                "Profile exported. No configuration was written to the keyboard.",
+                            )),
                             Err(error) => e.error(error),
                         }
                     }
@@ -1021,37 +1164,39 @@ impl Editor {
 
     fn import_file(self: &Rc<Self>, backup: bool) {
         if self.has_unprepared() {
-            self.status
-                .set_text("Prepare ou descarte a edição da macro antes de usar perfis.");
+            self.status.set_text(t(
+                "Prepare ou descarte a edição da macro antes de usar perfis.",
+                "Prepare or discard the macro edit before using profiles.",
+            ));
             return;
         }
         let e = self.clone();
         glib::MainContext::default().spawn_local(async move {
-            let dialog = gtk::FileDialog::builder().title(if backup { "Carregar backup F87 Pro" } else { "Importar perfil F87 Pro" }).build();
+            let dialog = gtk::FileDialog::builder().title(if backup { t("Carregar backup F87 Pro", "Load F87 Pro backup") } else { t("Importar perfil F87 Pro", "Import F87 Pro profile") }).build();
             match dialog.open_future(Some(&e.window)).await {
                 Ok(file) => if let Some(path) = file.path() {
                     let result = profiles::read_bytes(&path).and_then(|bytes| {
                         if let Ok(profile) = serde_json::from_slice::<profiles::Profile>(&bytes) { profile.state.validate()?; return Ok(profile); }
                         if let Ok(state) = state::decode(&bytes) { return Ok(profiles::Profile { name: "Backup F87 Pro".into(), state }); }
-                        let mut state = e.session.borrow().draft.clone().ok_or_else(|| std::io::Error::other("Leia o teclado antes de importar um backup antigo."))?;
+                        let mut state = e.session.borrow().draft.clone().ok_or_else(|| std::io::Error::other(t("Leia o teclado antes de importar um backup antigo.", "Read the keyboard before importing a legacy backup.")))?;
                         let (layer, payload) = state::legacy_backup(&bytes, bytes.len() != 134)?;
                         if let Some(index) = layer {
                             let layer = state.layers.get_mut(index as usize).filter(|layer| layer.len() == payload.len())
-                                .ok_or_else(|| std::io::Error::other("A camada ou o transporte do backup difere da conexão atual."))?;
+                                .ok_or_else(|| std::io::Error::other(t("A camada ou o transporte do backup difere da conexão atual.", "The backup's layer or transport differs from the current connection.")))?;
                             layer.copy_from_slice(payload);
                         } else {
                             if state.version == 2 && state.leds[14] != payload[14] {
-                                return Err(std::io::Error::other("Este backup LED pertence a outra conexão. Restaure usando o cabo ou carregue apenas RGB de um perfil."));
+                                return Err(std::io::Error::other(t("Este backup LED pertence a outra conexão. Restaure usando o cabo ou carregue apenas RGB de um perfil.", "This LED backup belongs to a different connection. Restore using the cable or load only RGB from a profile.")));
                             }
                             state.leds = payload.to_vec();
                         }
-                        Ok(profiles::Profile { name: "Backup importado".into(), state })
+                        Ok(profiles::Profile { name: t("Backup importado", "Imported backup").into(), state })
                     });
                     match result {
                         Ok(profile) => {
                             if !backup && let Err(error) = profiles::save(&e.data.join("profiles"), &profile.name, &profile.state) { e.error(error); return; }
                             e.profile_name.set_text(&profile.name); e.session.borrow_mut().draft = Some(profile.state); e.update_profiles();
-                            e.status.set_text("Arquivo carregado como rascunho. Revise as alterações antes de aplicar."); e.refresh();
+                            e.status.set_text(t("Arquivo carregado como rascunho. Revise as alterações antes de aplicar.", "File loaded as a draft. Review changes before applying.")); e.refresh();
                         }
                         Err(error) => e.error(error),
                     }
@@ -1074,6 +1219,32 @@ impl Editor {
     pub fn selected_key(&self) -> (u8, u8) {
         (self.layer.selected() as u8, self.selected.get())
     }
+    pub fn stage_controls(&self, controls: aula_f87pro::device_settings::Controls) {
+        if self.busy.get() {
+            return;
+        }
+        let result = {
+            let mut session = self.session.borrow_mut();
+            session
+                .draft
+                .as_mut()
+                .map(|state| controls.apply(&mut state.leds))
+        };
+        match result {
+            Some(Ok(())) => {
+                self.message(t(
+                    "Ajustes preparados. Use Aplicar alterações para gravar no teclado.",
+                    "Settings staged. Use Apply changes to write them to the keyboard.",
+                ));
+            }
+            Some(Err(error)) => self.error(error),
+            None => self.message(t(
+                "Carregue uma configuração antes de editar os ajustes.",
+                "Load a configuration before editing settings.",
+            )),
+        }
+    }
+
     pub fn message(&self, message: &str) {
         self.status.set_text(message);
         self.refresh();

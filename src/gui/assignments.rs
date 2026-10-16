@@ -1,12 +1,15 @@
-pub const MEDIA: &[(&str, [u8; 4])] = &[
-    ("Reproduzir / pausar", [2, 0, 0, 0xcd]),
-    ("Parar", [2, 0, 0, 0xb7]),
-    ("Faixa anterior", [2, 0, 0, 0xb6]),
-    ("Próxima faixa", [2, 0, 0, 0xb5]),
-    ("Aumentar volume", [2, 0, 0, 0xe9]),
-    ("Diminuir volume", [2, 0, 0, 0xea]),
-    ("Silenciar", [2, 0, 0, 0xe2]),
-];
+use super::i18n::t;
+pub fn media() -> [(&'static str, [u8; 4]); 7] {
+    [
+        (t("Reproduzir / pausar", "Play / pause"), [2, 0, 0, 0xcd]),
+        (t("Parar", "Stop"), [2, 0, 0, 0xb7]),
+        (t("Faixa anterior", "Previous track"), [2, 0, 0, 0xb6]),
+        (t("Próxima faixa", "Next track"), [2, 0, 0, 0xb5]),
+        (t("Aumentar volume", "Volume up"), [2, 0, 0, 0xe9]),
+        (t("Diminuir volume", "Volume down"), [2, 0, 0, 0xea]),
+        (t("Silenciar", "Mute"), [2, 0, 0, 0xe2]),
+    ]
+}
 
 pub fn standard(name: &str) -> Option<[u8; 4]> {
     let modifier = match name {
@@ -80,29 +83,29 @@ pub fn keyboard_choices() -> Vec<(&'static str, [u8; 4])> {
 
 pub fn describe(code: [u8; 4]) -> String {
     if code == [0; 4] {
-        return "Desativada".into();
+        return t("Desativada", "Disabled").into();
     }
     if code == [13, 0, 0, 0] {
-        return "Função Fn".into();
+        return t("Função Fn", "Fn function").into();
     }
     if code[0] == 3 {
         return format!("Macro {}", u16::from(code[3]) + 1);
     }
-    if let Some((name, _)) = MEDIA.iter().find(|(_, value)| *value == code) {
+    if let Some((name, _)) = media().iter().find(|(_, value)| *value == code) {
         return (*name).into();
     }
     if code[0] != 0 {
-        return "Função específica do teclado".into();
+        return t("Função específica do teclado", "Keyboard-specific function").into();
     }
     let mut parts: Vec<String> = [
         (1, "Ctrl"),
         (2, "Shift"),
         (4, "Alt"),
         (8, "Super"),
-        (16, "Ctrl direito"),
-        (32, "Shift direito"),
-        (64, "Alt direito"),
-        (128, "Super direito"),
+        (16, t("Ctrl direito", "Right Ctrl")),
+        (32, t("Shift direito", "Right Shift")),
+        (64, t("Alt direito", "Right Alt")),
+        (128, t("Super direito", "Right Super")),
     ]
     .iter()
     .filter(|(bit, _)| code[1] & bit != 0)
@@ -114,11 +117,11 @@ pub fn describe(code: [u8; 4]) -> String {
                 .iter()
                 .find(|(name, _)| standard(name) == Some([0, 0, 0, hid]))
                 .map(|(name, _)| (*name).into())
-                .unwrap_or_else(|| "Tecla especial".into()),
+                .unwrap_or_else(|| t("Tecla especial", "Special key").into()),
         );
     }
     if parts.is_empty() {
-        "Função específica do teclado".into()
+        t("Função específica do teclado", "Keyboard-specific function").into()
     } else {
         parts.join(" + ")
     }

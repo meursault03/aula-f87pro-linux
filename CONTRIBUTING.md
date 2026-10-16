@@ -1,7 +1,7 @@
 # Development
 
 Linux x86_64, Rust ≥ 1.92, GTK4 ≥ 4.10, Python ≥ 3.11 and a C toolchain are required.
-The interface currently uses Portuguese; both README versions describe the same release.
+The interface supports Portuguese and English; each README uses screenshots in its own language.
 
 Install build dependencies:
 
@@ -37,10 +37,11 @@ The native GTK smoke test uses Xvfb, D-Bus, xdotool and ImageMagick. Install tho
 tools, build debug binaries with `cargo build --locked --features gui --bins`, then run:
 
 ```sh
-xvfb-run -a -s '-screen 0 1440x1200x24' env -u WAYLAND_DISPLAY GTK_THEME=Adwaita:dark dbus-run-session -- python3 tests/gui_smoke.py
-xvfb-run -a -s '-screen 0 1440x1200x24' env -u WAYLAND_DISPLAY GTK_THEME=Adwaita:dark F87_TEST_RADIO=1 dbus-run-session -- python3 tests/gui_smoke.py
+xvfb-run -a -s '-screen 0 1440x1600x24' env -u WAYLAND_DISPLAY GTK_THEME=Adwaita:dark dbus-run-session -- python3 tests/gui_smoke.py
+xvfb-run -a -s '-screen 0 1440x1600x24' env -u WAYLAND_DISPLAY GTK_THEME=Adwaita:dark F87_TEST_RADIO=1 dbus-run-session -- python3 tests/gui_smoke.py
 ```
 
+`F87_TEST_ENGLISH=1` tests the English interface.
 `F87_TEST_REDUCED_MOTION=1` checks that the preview stays still. These tests use
 isolated demonstration state and a simulated CLI: **they never write to HID**.
 
@@ -54,7 +55,7 @@ It publishes a prerelease only after all jobs pass. Tags must match Cargo's vers
 python3 scripts/package.py --format tar
 # Needs dpkg-deb and readelf; use Ubuntu 24.04 for distributable Debian binaries.
 python3 scripts/package.py --format deb
-python3 scripts/package.py --arch-recipe dist/aula-f87pro-0.1.0-linux-x86_64.tar.gz
+python3 scripts/package.py --arch-recipe dist/aula-f87pro-0.2.0-linux-x86_64.tar.gz
 ```
 
 The generated `PKGBUILD` verifies the exact release archive by SHA-256. On Arch,

@@ -25,3 +25,5 @@
 .pending-text { color: @theme_fg_color; font-weight: 600; }
 .connection { font-size: 12px; opacity: 0.75; }
 .keycap.edited { border-top-color: #ffc66b; border-left-color: #ffc66b; border-right-color: #ffc66b; }
+
+.setting-label, .setting-value { font-weight: 500; }

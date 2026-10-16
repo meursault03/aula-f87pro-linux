@@ -1,3 +1,4 @@
+use super::i18n::{t, tf};
 use super::{
     assignments,
     editor::{Editor, section, text},
@@ -68,41 +69,51 @@ impl MacroEditor {
         let names = key_choices();
         let this = Rc::new(Self {
             widget: section(
-                "Sequências de teclado",
-                "Adicione pressionamentos, liberações e intervalos. A macro precisa soltar todas as teclas antes de terminar.",
+                t("Sequências de teclado", "Keyboard sequences"),
+                t(
+                    "Adicione pressionamentos, liberações e intervalos. A macro precisa soltar todas as teclas antes de terminar.",
+                    "Add key presses, releases and delays. The macro must release all keys before it ends.",
+                ),
             ),
             editor: Rc::downgrade(editor),
-            slot: gtk::DropDown::from_strings(&["Nova macro"]),
+            slot: gtk::DropDown::from_strings(&[t("Nova macro", "New macro")]),
             name: gtk::Entry::builder()
-                .placeholder_text("Nome da macro")
+                .placeholder_text(t("Nome da macro", "Macro name"))
                 .max_length(30)
                 .build(),
             key: gtk::DropDown::from_strings(
                 &names.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
             ),
-            action: gtk::DropDown::from_strings(&["Toque completo", "Pressionar", "Soltar"]),
+            action: gtk::DropDown::from_strings(&[
+                t("Toque completo", "Full tap"),
+                t("Pressionar", "Press"),
+                t("Soltar", "Release"),
+            ]),
             delay: gtk::SpinButton::with_range(0.0, 1_048_575.0, 1.0),
             mode: gtk::DropDown::from_strings(&[
-                "Repetir N vezes",
-                "Enquanto pressionada",
-                "Alternar ao pressionar",
+                t("Repetir N vezes", "Repeat N times"),
+                t("Enquanto pressionada", "While held"),
+                t("Alternar ao pressionar", "Toggle on press"),
             ]),
             repeat: gtk::SpinButton::with_range(1.0, 255.0, 1.0),
-            bind: gtk::CheckButton::with_label("Vincular à tecla selecionada"),
+            bind: gtk::CheckButton::with_label(t(
+                "Vincular à tecla selecionada",
+                "Bind to selected key",
+            )),
             target: text("", "muted"),
             target_key: gtk::DropDown::from_strings(
                 &KEYS.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
             ),
             target_layer: gtk::DropDown::from_strings(&[
-                "Camada 0 — principal",
-                "Camada 1",
-                "Camada 2",
-                "Camada 3",
+                t("Camada 0 — principal", "Layer 0 — main"),
+                t("Camada 1", "Layer 1"),
+                t("Camada 2", "Layer 2"),
+                t("Camada 3", "Layer 3"),
             ]),
-            memory: text("Aguardando leitura…", "muted"),
+            memory: text(t("Aguardando leitura…", "Waiting to read…"), "muted"),
             warning: text("", "pending-text"),
             list: gtk::Box::new(gtk::Orientation::Vertical, 6),
-            prepare: gtk::Button::with_label("Preparar macro"),
+            prepare: gtk::Button::with_label(t("Preparar macro", "Prepare macro")),
             events: RefCell::new(Vec::new()),
             buffer: RefCell::new(Vec::new()),
             blobs: RefCell::new(Vec::new()),
@@ -119,18 +130,24 @@ impl MacroEditor {
         this.slot.set_hexpand(true);
         this.name.set_hexpand(true);
         this.slot
-            .update_property(&[gtk::accessible::Property::Label("Macro para editar")]);
+            .update_property(&[gtk::accessible::Property::Label(t(
+                "Macro para editar",
+                "Macro to edit",
+            ))]);
         this.name
-            .update_property(&[gtk::accessible::Property::Label("Nome da macro")]);
+            .update_property(&[gtk::accessible::Property::Label(t(
+                "Nome da macro",
+                "Macro name",
+            ))]);
         top.append(&this.slot);
         top.append(&this.name);
         this.widget.append(&top);
         this.widget.append(&this.memory);
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
         for (caption, widget) in [
-            ("Tecla", this.key.upcast_ref::<gtk::Widget>()),
-            ("Evento", this.action.upcast_ref()),
-            ("Intervalo (ms)", this.delay.upcast_ref()),
+            (t("Tecla", "Key"), this.key.upcast_ref::<gtk::Widget>()),
+            (t("Evento", "Event"), this.action.upcast_ref()),
+            (t("Intervalo (ms)", "Delay (ms)"), this.delay.upcast_ref()),
         ] {
             let column = gtk::Box::new(gtk::Orientation::Vertical, 4);
             column.set_hexpand(true);
@@ -139,7 +156,7 @@ impl MacroEditor {
             column.append(widget);
             row.append(&column);
         }
-        let add = gtk::Button::with_label("Adicionar evento");
+        let add = gtk::Button::with_label(t("Adicionar evento", "Add event"));
         row.append(&add);
         this.widget.append(&row);
         let scroll = gtk::ScrolledWindow::builder()
@@ -152,9 +169,15 @@ impl MacroEditor {
         let playback = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         this.mode.set_hexpand(true);
         this.mode
-            .update_property(&[gtk::accessible::Property::Label("Modo de repetição")]);
+            .update_property(&[gtk::accessible::Property::Label(t(
+                "Modo de repetição",
+                "Playback mode",
+            ))]);
         this.repeat
-            .update_property(&[gtk::accessible::Property::Label("Número de repetições")]);
+            .update_property(&[gtk::accessible::Property::Label(t(
+                "Número de repetições",
+                "Repeat count",
+            ))]);
         playback.append(&this.mode);
         playback.append(&this.repeat);
         this.widget.append(&playback);
@@ -162,13 +185,15 @@ impl MacroEditor {
         let target = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         this.target_key.set_hexpand(true);
         this.target_key
-            .update_property(&[gtk::accessible::Property::Label(
+            .update_property(&[gtk::accessible::Property::Label(t(
                 "Tecla de destino da macro",
-            )]);
+                "Macro target key",
+            ))]);
         this.target_layer
-            .update_property(&[gtk::accessible::Property::Label(
+            .update_property(&[gtk::accessible::Property::Label(t(
                 "Camada de destino da macro",
-            )]);
+                "Macro target layer",
+            ))]);
         target.append(&this.target_key);
         target.append(&this.target_layer);
         this.widget.append(&target);
@@ -177,7 +202,7 @@ impl MacroEditor {
         this.prepare.set_halign(gtk::Align::End);
         let actions = gtk::Box::new(gtk::Orientation::Horizontal, 12);
         actions.set_halign(gtk::Align::End);
-        let discard = gtk::Button::with_label("Descartar edição da macro");
+        let discard = gtk::Button::with_label(t("Descartar edição da macro", "Discard macro edit"));
         actions.append(&discard);
         actions.append(&this.prepare);
         this.widget.append(&actions);
@@ -188,8 +213,10 @@ impl MacroEditor {
                     m.syncing.set(true);
                     m.slot.set_selected(m.last_slot.get());
                     m.syncing.set(false);
-                    m.warning
-                        .set_text("Prepare ou descarte a edição atual antes de trocar de macro.");
+                    m.warning.set_text(t(
+                        "Prepare ou descarte a edição atual antes de trocar de macro.",
+                        "Prepare or discard the current edit before switching macros.",
+                    ));
                 } else {
                     m.select();
                 }
@@ -249,8 +276,9 @@ impl MacroEditor {
 
     fn update_target(self: &Rc<Self>) {
         let target = self.target_selection();
-        self.target.set_text(&format!(
+        self.target.set_text(&tf!(
             "Destino: {} · camada {}",
+            "Target: {} · layer {}",
             KEYS[usize::from(target.1) - 1].0,
             target.0
         ));
@@ -307,9 +335,11 @@ impl MacroEditor {
         self.widget.set_sensitive(!radio);
         if radio {
             self.prepare.set_sensitive(false);
-            self.memory
-                .set_text("Macros preservadas · edição disponível por cabo USB.");
-            self.warning.set_text("O receptor permite ler apenas parte da memória. Conecte por cabo para editar macros com backup completo.");
+            self.memory.set_text(t(
+                "Macros preservadas · edição disponível por cabo USB.",
+                "Macros preserved · editing available over USB cable.",
+            ));
+            self.warning.set_text(t("O receptor permite ler apenas parte da memória. Conecte por cabo para editar macros com backup completo.", "The receiver can only read part of the memory. Connect by cable to edit macros with a complete backup."));
             return;
         }
         let destination = self.target_selection();
@@ -338,17 +368,25 @@ impl MacroEditor {
                     .map(|(i, blob)| {
                         macros::decode_definition(blob)
                             .map(|definition| format!("{} · {}", i + 1, definition.name))
-                            .unwrap_or_else(|_| format!("{} · outros eventos (preservada)", i + 1))
+                            .unwrap_or_else(|_| {
+                                tf!(
+                                    "{} · outros eventos (preservada)",
+                                    "{} · other events (preserved)",
+                                    i + 1
+                                )
+                            })
                     })
                     .collect();
-                names.push("Nova macro".into());
+                names.push(t("Nova macro", "New macro").into());
                 self.slot.set_model(Some(&gtk::StringList::new(
                     &names.iter().map(String::as_str).collect::<Vec<_>>(),
                 )));
                 self.slot.set_selected(index.min(blobs.len() as u32));
                 let used = blobs.len() * 4 + blobs.iter().map(Vec::len).sum::<usize>();
-                self.memory.set_text(&format!(
-                    "{} macros · {used} de 4096 bytes utilizados",
+                let noun = if blobs.len() == 1 { "macro" } else { "macros" };
+                self.memory.set_text(&tf!(
+                    "{} {noun} · {used} de 4096 bytes utilizados",
+                    "{} {noun} · {used} of 4096 bytes used",
                     blobs.len()
                 ));
                 self.blobs.replace(blobs);
@@ -356,15 +394,17 @@ impl MacroEditor {
                 if !unprepared {
                     self.select();
                 } else {
-                    self.warning.set_text("A edição local foi preservada. Prepare ou descarte antes de trocar de macro.");
+                    self.warning.set_text(t("A edição local foi preservada. Prepare ou descarte antes de trocar de macro.", "The local edit was preserved. Prepare or discard it before switching macros."));
                 }
                 if target_changed || binding_changed {
                     self.update_target();
                 }
             }
             Err(_) => {
-                self.memory
-                    .set_text("Formato de macros não reconhecido. O conteúdo será preservado.");
+                self.memory.set_text(t(
+                    "Formato de macros não reconhecido. O conteúdo será preservado.",
+                    "Unrecognized macro format. Its contents will be preserved.",
+                ));
                 self.prepare.set_sensitive(false);
             }
         }
@@ -395,7 +435,7 @@ impl MacroEditor {
             Err(_) => {
                 self.initial.replace(None);
                 self.last_slot.set(self.slot.selected());
-                self.warning.set_text("Esta macro contém eventos ainda não editáveis. Ela será mantida sem alterações.");
+                self.warning.set_text(t("Esta macro contém eventos ainda não editáveis. Ela será mantida sem alterações.", "This macro contains events that cannot be edited yet. It will be kept unchanged."));
                 self.prepare.set_sensitive(false);
             }
         }
@@ -406,7 +446,8 @@ impl MacroEditor {
             return;
         };
         if self.events.borrow().len() >= 999 {
-            self.warning.set_text("Limite de eventos atingido.");
+            self.warning
+                .set_text(t("Limite de eventos atingido.", "Event limit reached."));
             return;
         }
         let event = MacroEvent {
@@ -433,9 +474,13 @@ impl MacroEditor {
         for (i, event) in self.events.borrow().iter().enumerate() {
             let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
             row.append(&text(&format!("{:02}", i + 1), "muted"));
-            let action = gtk::DropDown::from_strings(&["Pressionar", "Soltar"]);
+            let action =
+                gtk::DropDown::from_strings(&[t("Pressionar", "Press"), t("Soltar", "Release")]);
             action.set_selected(u32::from(!event.pressed));
-            action.update_property(&[gtk::accessible::Property::Label("Ação do evento")]);
+            action.update_property(&[gtk::accessible::Property::Label(t(
+                "Ação do evento",
+                "Event action",
+            ))]);
             let key = gtk::DropDown::from_strings(
                 &choices.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
             );
@@ -446,12 +491,16 @@ impl MacroEditor {
                     .map_or(gtk::INVALID_LIST_POSITION, |n| n as u32),
             );
             key.set_hexpand(true);
-            key.update_property(&[gtk::accessible::Property::Label("Tecla do evento")]);
+            key.update_property(&[gtk::accessible::Property::Label(t(
+                "Tecla do evento",
+                "Event key",
+            ))]);
             let delay = gtk::SpinButton::with_range(0.0, 1_048_575.0, 1.0);
             delay.set_value(f64::from(event.delay_ms));
-            delay.update_property(&[gtk::accessible::Property::Label(
+            delay.update_property(&[gtk::accessible::Property::Label(t(
                 "Intervalo do evento em milissegundos",
-            )]);
+                "Event delay in milliseconds",
+            ))]);
             let m = self.clone();
             action.connect_selected_notify(move |value| {
                 if let Some(event) = m.events.borrow_mut().get_mut(i) {
@@ -479,9 +528,21 @@ impl MacroEditor {
             row.append(&key);
             row.append(&delay);
             for (icon, label, direction) in [
-                ("go-up-symbolic", "Mover evento para cima", -1),
-                ("go-down-symbolic", "Mover evento para baixo", 1),
-                ("edit-delete-symbolic", "Remover evento", 0),
+                (
+                    "go-up-symbolic",
+                    t("Mover evento para cima", "Move event up"),
+                    -1,
+                ),
+                (
+                    "go-down-symbolic",
+                    t("Mover evento para baixo", "Move event down"),
+                    1,
+                ),
+                (
+                    "edit-delete-symbolic",
+                    t("Remover evento", "Remove event"),
+                    0,
+                ),
             ] {
                 let button = gtk::Button::from_icon_name(icon);
                 button.set_tooltip_text(Some(label));
@@ -507,7 +568,10 @@ impl MacroEditor {
         }
         if self.events.borrow().is_empty() {
             self.list.append(&text(
-                "A sequência está vazia. Adicione o primeiro evento acima.",
+                t(
+                    "A sequência está vazia. Adicione o primeiro evento acima.",
+                    "The sequence is empty. Add the first event above.",
+                ),
                 "muted",
             ));
         }
@@ -519,15 +583,12 @@ impl MacroEditor {
         };
         let result = (|| -> std::io::Result<()> {
             let mut session = editor.session.borrow_mut();
-            let draft = session
-                .draft
-                .as_mut()
-                .ok_or_else(|| std::io::Error::other("Leia o teclado primeiro."))?;
-            let buffer = draft
-                .macros
-                .as_slice()
-                .try_into()
-                .map_err(|_| std::io::Error::other("Buffer de macros inválido."))?;
+            let draft = session.draft.as_mut().ok_or_else(|| {
+                std::io::Error::other(t("Leia o teclado primeiro.", "Read the keyboard first."))
+            })?;
+            let buffer = draft.macros.as_slice().try_into().map_err(|_| {
+                std::io::Error::other(t("Buffer de macros inválido.", "Invalid macro buffer."))
+            })?;
             let definition = MacroDefinition {
                 name: self.name.text().to_string(),
                 events: self.events.borrow().clone(),
@@ -561,19 +622,20 @@ impl MacroEditor {
                     events: self.events.borrow().clone(),
                 }));
                 self.warning.set_text("");
-                editor.message(
+                editor.message(t(
                     "Macro preparada no rascunho. Revise e aplique para gravar no teclado.",
-                );
+                    "Macro prepared in the draft. Review and apply to write it to the keyboard.",
+                ));
             }
             Err(error) => {
                 self.warning.set_text(
                     if error.to_string().contains("paired") || error.to_string().contains("release")
                     {
-                        "Cada tecla pressionada precisa ser solta, sem pressionamentos duplicados."
+                        t("Cada tecla pressionada precisa ser solta, sem pressionamentos duplicados.", "Every pressed key must be released, without duplicate presses.")
                     } else if error.to_string().contains("full") {
-                        "Memória de macros cheia. Encurte a sequência."
+                        t("Memória de macros cheia. Encurte a sequência.", "Macro memory full. Shorten the sequence.")
                     } else {
-                        "Não foi possível preparar a macro. Verifique nome, eventos e intervalos."
+                        t("Não foi possível preparar a macro. Verifique nome, eventos e intervalos.", "Could not prepare the macro. Check its name, events and delays.")
                     },
                 );
                 editor.error(error);

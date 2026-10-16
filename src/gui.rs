@@ -1,10 +1,15 @@
 use aula_f87pro::discovery::{self, Transport};
-use gtk::{glib, prelude::*};
+use gtk::{gio, glib, prelude::*};
+use i18n::t;
 use std::{cell::Cell, rc::Rc};
+#[path = "gui/app_settings.rs"]
+mod app_settings;
 #[path = "gui/assignments.rs"]
 mod assignments;
 #[path = "gui/editor.rs"]
 mod editor;
+#[path = "gui/i18n.rs"]
+mod i18n;
 #[path = "gui/keyboard.rs"]
 mod keyboard;
 #[path = "gui/lighting_preview.rs"]
@@ -15,6 +20,8 @@ mod macro_ui;
 mod profiles;
 #[path = "gui/session.rs"]
 mod session;
+#[path = "gui/settings_ui.rs"]
+mod settings_ui;
 
 fn connection() -> Option<Transport> {
     discovery::connections()
@@ -37,15 +44,40 @@ fn build(app: &gtk::Application) {
     let editor = editor::Editor::new(&window);
     window.set_child(Some(&editor.root));
     let closing = Rc::new(Cell::new(false));
+    let explicit_quit = Rc::new(Cell::new(false));
+    let quit = gio::SimpleAction::new("quit", None);
+    let requested = explicit_quit.clone();
+    let parent = window.clone();
+    quit.connect_activate(move |_, _| {
+        requested.set(true);
+        parent.close();
+    });
+    app.add_action(&quit);
+    app.set_accels_for_action("app.quit", &["<Primary>q"]);
+    let menu = gio::Menu::new();
+    menu.append(
+        Some(t("Encerrar aplicativo", "Quit application")),
+        Some("app.quit"),
+    );
+    let menu_button = gtk::MenuButton::builder()
+        .icon_name("open-menu-symbolic")
+        .menu_model(&menu)
+        .tooltip_text(t("Menu do aplicativo", "Application menu"))
+        .build();
+    header.pack_end(&menu_button);
     let e = editor.clone();
     let may_close = closing.clone();
     window.connect_close_request(move |window| {
         if may_close.get() { return glib::Propagation::Proceed; }
-        if e.busy.get() { e.message("Aguarde a operação terminar antes de fechar."); return glib::Propagation::Stop; }
+        if !explicit_quit.replace(false) && e.preferences.borrow().minimize_on_close {
+            window.minimize();
+            return glib::Propagation::Stop;
+        }
+        if e.busy.get() { e.message(t("Aguarde a operação terminar antes de fechar.", "Wait for the operation to finish before closing.")); return glib::Propagation::Stop; }
         if e.has_unsaved() {
-            let dialog = gtk::AlertDialog::builder().message("Há alterações ainda não aplicadas")
-                .detail("Você pode continuar editando e salvar um perfil, ou descartar as edições ao fechar.")
-                .buttons(["Continuar editando", "Descartar e fechar"]).default_button(0).cancel_button(0).build();
+            let dialog = gtk::AlertDialog::builder().message(t("Há alterações ainda não aplicadas", "There are unapplied changes"))
+                .detail(t("Você pode continuar editando e salvar um perfil, ou descartar as edições ao fechar.", "You can keep editing and save a profile, or discard the edits when closing."))
+                .buttons([t("Continuar editando", "Keep editing"), t("Descartar e fechar", "Discard and close")]).default_button(0).cancel_button(0).build();
             let parent = window.clone(); let closing = may_close.clone();
             glib::MainContext::default().spawn_local(async move {
                 if dialog.choose_future(Some(&parent)).await == Ok(1) { closing.set(true); parent.close(); }
@@ -81,6 +113,10 @@ fn build(app: &gtk::Application) {
 }
 
 fn main() -> glib::ExitCode {
+    let preferences =
+        app_settings::Preferences::load(&glib::user_config_dir().join("aula-f87pro/settings.json"))
+            .unwrap_or_default();
+    i18n::init(preferences.english);
     let app = gtk::Application::builder()
         .application_id("io.github.aula_f87pro.Control")
         .build();
@@ -93,6 +129,12 @@ fn main() -> glib::ExitCode {
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
         );
     });
-    app.connect_activate(build);
+    app.connect_activate(|app| {
+        if let Some(window) = app.active_window() {
+            window.present();
+        } else {
+            build(app);
+        }
+    });
     app.run()
 }

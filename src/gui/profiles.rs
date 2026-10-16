@@ -1,3 +1,4 @@
+use super::i18n::t;
 use aula_f87pro::state::Snapshot;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -16,9 +17,10 @@ pub struct Profile {
 
 fn validate(name: &str, state: &Snapshot) -> io::Result<()> {
     if name.trim().is_empty() || name.chars().count() > 80 || name.chars().any(char::is_control) {
-        return Err(io::Error::other(
+        return Err(io::Error::other(t(
             "Use um nome de perfil com 1 a 80 caracteres, sem quebras de linha.",
-        ));
+            "Use a profile name with 1 to 80 characters and no line breaks.",
+        )));
     }
     state.validate()
 }
@@ -29,9 +31,10 @@ pub fn read_bytes(path: &Path) -> io::Result<Vec<u8>> {
         .take(96 * 1024 + 1)
         .read_to_end(&mut bytes)?;
     if bytes.len() > 96 * 1024 {
-        return Err(io::Error::other(
+        return Err(io::Error::other(t(
             "Arquivo grande demais para um perfil F87 Pro.",
-        ));
+            "File is too large for an F87 Pro profile.",
+        )));
     }
     Ok(bytes)
 }
@@ -58,9 +61,12 @@ pub fn entries(dir: &Path) -> io::Result<Vec<(String, PathBuf)>> {
 }
 
 pub fn atomic_write(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| io::Error::other("Pasta de destino inválida."))?;
+    let parent = path.parent().ok_or_else(|| {
+        io::Error::other(t(
+            "Pasta de destino inválida.",
+            "Invalid destination folder.",
+        ))
+    })?;
     fs::create_dir_all(parent)?;
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)

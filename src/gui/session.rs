@@ -1,29 +1,45 @@
+use super::i18n::t;
 use aula_f87pro::state::Snapshot;
 
 pub fn error_status(message: &str) -> (&'static str, bool) {
     if message.contains("ROLLBACK FAILED") {
         (
-            "Falha ao aplicar e recuperar o teclado. Recarregue o estado e restaure o backup indicado nos detalhes.",
+            t(
+                "Falha ao aplicar e recuperar o teclado. Conecte por USB, recarregue e restaure o backup indicado nos detalhes.",
+                "Failed to apply and recover the keyboard. Connect over USB, reload and restore the backup shown in the details.",
+            ),
             true,
         )
     } else if message.contains("original state restored") {
         (
-            "Não foi possível aplicar; o estado anterior foi restaurado. Suas edições locais foram mantidas.",
+            t(
+                "Não foi possível aplicar; o estado anterior foi restaurado. Suas edições locais foram mantidas.",
+                "Could not apply; the previous state was restored. Your local edits were preserved.",
+            ),
             false,
         )
     } else if message.contains("changed since") {
         (
-            "O teclado mudou fora do app. Salve o rascunho como perfil e recarregue.",
+            t(
+                "O teclado mudou fora do app. Salve o rascunho como perfil e recarregue.",
+                "The keyboard changed outside the app. Save the draft as a profile and reload.",
+            ),
             true,
         )
     } else if message.contains("Permission denied") {
         (
-            "Sem permissão para acessar o teclado. Consulte os detalhes.",
+            t(
+                "Sem permissão para acessar o teclado. Consulte os detalhes.",
+                "No permission to access the keyboard. See details.",
+            ),
             false,
         )
     } else {
         (
-            "Não foi possível concluir. Nenhuma edição local foi descartada. Consulte os detalhes.",
+            t(
+                "Não foi possível concluir. Nenhuma edição local foi descartada. Consulte os detalhes.",
+                "Could not complete the operation. No local edits were discarded. See details.",
+            ),
             false,
         )
     }

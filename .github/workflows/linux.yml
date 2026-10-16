@@ -34,8 +34,10 @@ jobs:
         run: cargo build --locked --features gui --bins && cargo build --locked --release --features gui --bins
       - name: Test native GTK with isolated demonstration data
         run: |
-          xvfb-run -a -s '-screen 0 1440x1200x24' env -u WAYLAND_DISPLAY GTK_THEME=Adwaita:dark dbus-run-session -- python3 tests/gui_smoke.py
-          xvfb-run -a -s '-screen 0 1440x1200x24' env -u WAYLAND_DISPLAY GTK_THEME=Adwaita:dark F87_TEST_RADIO=1 dbus-run-session -- python3 tests/gui_smoke.py
+          xvfb-run -a -s '-screen 0 1440x1600x24' env -u WAYLAND_DISPLAY GTK_THEME=Adwaita:dark dbus-run-session -- python3 tests/gui_smoke.py
+          xvfb-run -a -s '-screen 0 1440x1600x24' env -u WAYLAND_DISPLAY GTK_THEME=Adwaita:dark F87_TEST_RADIO=1 dbus-run-session -- python3 tests/gui_smoke.py
+          xvfb-run -a -s '-screen 0 1440x1600x24' env -u WAYLAND_DISPLAY GTK_THEME=Adwaita:dark F87_TEST_ENGLISH=1 dbus-run-session -- python3 tests/gui_smoke.py
+          xvfb-run -a -s '-screen 0 1440x1600x24' env -u WAYLAND_DISPLAY GTK_THEME=Adwaita:dark F87_TEST_ENGLISH=1 F87_TEST_RADIO=1 dbus-run-session -- python3 tests/gui_smoke.py
       - name: Package Linux binaries
         run: |
           python3 scripts/package.py --format tar

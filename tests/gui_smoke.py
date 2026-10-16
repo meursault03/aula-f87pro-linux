@@ -47,13 +47,16 @@ def main():
                     "leds": list((fixture / "f87pro-led-read.bin").read_bytes()),
                     "layers": [list((fixture / "f87pro-matrix-layer0.bin").read_bytes()) for _ in range(4)],
                     "macros": [0] * 4096}
+        english = os.environ.get("F87_TEST_ENGLISH") == "1"
+        example = "Example" if english else "Exemplo"
+        imported_name = "Gaming" if english else "Jogos"
         radio = os.environ.get("F87_TEST_RADIO") == "1"
         if radio:
             cable_rgb = json.loads(json.dumps(original))
             cable_rgb["leds"][10] = 2
             profiles = folder / "data/aula-f87pro/profiles"
             profiles.mkdir(parents=True)
-            (profiles / "cable-rgb.json").write_text(json.dumps({"name": "RGB via cabo", "state": cable_rgb}))
+            (profiles / "cable-rgb.json").write_text(json.dumps({"name": "USB RGB" if english else "RGB via cabo", "state": cable_rgb}))
             original["version"] = 2
             original["layers"] = [layer[:504] for layer in original["layers"][:2]]
             original["macros"] = original["macros"][:512]
@@ -66,6 +69,9 @@ def main():
         settings.write_text("[Settings]\ngtk-font-name=DejaVu Sans 10\n" +
                             ("gtk-enable-animations=false\n" if reduced_motion else ""))
         env["XDG_CONFIG_HOME"] = str(folder / "config")
+        preference_file = folder / "config/aula-f87pro/settings.json"
+        preference_file.parent.mkdir(parents=True)
+        preference_file.write_text(json.dumps({"english": english}))
         with (ARTIFACTS / "gui-smoke.log").open("w") as log:
             app = subprocess.Popen([str(folder / "aula-f87pro-gui")], env=env, stdout=log, stderr=subprocess.STDOUT)
             try:
@@ -77,6 +83,17 @@ def main():
                     subprocess.run(["xdotool", "key", "--clearmodifiers", *keys], check=True)
                     time.sleep(.2)
                 def capture(name):
+                    destination = os.environ.get("F87_SCREENSHOT_DIR")
+                    public = {"gui-lighting-preview.png": ("lighting.png", 960), "gui-keys.png": ("keys.png", 1100), "gui-profiles-final.png": ("profiles.png", 900), "gui-macro-filled.png": ("macros.png", 900), "gui-settings.png": ("settings.png", 1400)}
+                    if destination and name in public:
+                        filename, height = public[name]
+                        subprocess.run(["xdotool", "windowsize", window, "1080", str(height)], check=True)
+                        time.sleep(.3)
+                        target = Path(destination)
+                        target.mkdir(parents=True, exist_ok=True)
+                        subprocess.run(["import", "-window", window, str(target / filename)], check=True)
+                        subprocess.run(["xdotool", "windowsize", window, "1080", "900"], check=True)
+                        time.sleep(.3)
                     subprocess.run(["import", "-window", window, str(ARTIFACTS / name)], check=True)
                 def choose_file(title, path):
                     try:
@@ -88,7 +105,7 @@ def main():
                         raise
                     subprocess.run(["xdotool", "windowfocus", dialog], check=True)
                     time.sleep(.3)
-                    if title.startswith("Importar"):
+                    if title.startswith(("Importar", "Import")):
                         # The isolated Recent list contains the profile just exported by this test.
                         subprocess.run(["xdotool", "mousemove", "--window", dialog, "350", "88", "click", "--repeat", "2", "--delay", "100", "1"], check=True)
                     else:
@@ -108,6 +125,48 @@ def main():
                         time.sleep(.05)
                     capture("gui-smoke-failure.png")
                     raise AssertionError(f"No {command} call #{number}; calls: {calls}")
+                def settings_check(previous_calls):
+                    key("ctrl+5")
+                    subprocess.run(["xdotool", "windowsize", window, "1080", "1400"], check=True)
+                    time.sleep(.3)
+                    click(975, 524)
+                    key("Home", "Down", "Down", "Down", "Return")
+                    click(975, 576)
+                    key("Home", *(["Down"] * 7), "Return")
+                    click(845, 620)
+                    before = [json.loads(line) for line in (folder / "calls.jsonl").read_text().splitlines()]
+                    assert sum(call[0] == "apply-state" for call in before) == previous_calls, "Settings wrote before Apply"
+                    subprocess.run(["xdotool", "windowsize", window, "1080", "900"], check=True)
+                    time.sleep(.3)
+                    click(985, 860)
+                    wait_calls("apply-state", previous_calls + 1)
+                    changed = json.loads((folder / "state.json").read_text())
+                    assert [changed["leds"][i] for i in (3,22,24)] == [3,127,10], changed["leds"]
+                    for i in range(128):
+                        if i not in (3,22,24): assert changed["leds"][i] == original["leds"][i], i
+                    assert changed["layers"] == original["layers"] and changed["macros"] == original["macros"]
+                    click(700, 860)
+                    wait_calls("apply-state", previous_calls + 2)
+                    assert json.loads((folder / "state.json").read_text()) == original
+                    capture("gui-settings.png")
+                    subprocess.run(["xdotool", "windowsize", window, "1080", "1400"], check=True)
+                    time.sleep(.3)
+                    click(1000, 945)
+                    autostart = folder / "config/autostart/io.github.aula_f87pro.Control.desktop"
+                    assert autostart.exists(), "Start at login was not saved"
+                    click(1000, 945)
+                    assert not autostart.exists(), "Start at login was not disabled"
+                    click(970, 996)
+                    key("End", "Return")
+                    assert json.loads(preference_file.read_text())["minimize_on_close"]
+                    click(970, 896)
+                    key("Home" if english else "End", "Return")
+                    assert json.loads(preference_file.read_text())["english"] != english
+                    click(1055, 27)
+                    assert app.poll() is None, "Closing in minimize mode quit the application"
+                    key("ctrl+q")
+                    assert app.wait(timeout=5) == 0, "Explicit Quit did not close the application"
+
                 time.sleep(.6)
                 if not (folder / "calls.jsonl").exists():
                     click(960, 95)  # Reload also exercises the mock when no real HID is present.
@@ -134,31 +193,34 @@ def main():
                 click(985, 860)
                 wait_calls("apply-state", 1)
                 assert json.loads((folder / "state.json").read_text())["leds"][10] == 2
-                click(650, 860)
+                click(700, 860)
                 wait_calls("apply-state", 2)
                 assert json.loads((folder / "state.json").read_text()) == original
+                key("ctrl+2")
+                capture("gui-keys.png")
                 if radio:
-                    click(730, 153)
+                    key("ctrl+4")
                     capture("gui-radio-profiles.png")
-                    click(745, 359)  # Load RGB only from the USB profile, preserving radio flags and matrices.
+                    click(690, 359)  # Load RGB only from the USB profile, preserving radio flags and matrices.
                     click(985, 860)
                     wait_calls("apply-state", 3)
                     state = json.loads((folder / "state.json").read_text())
                     assert state["version"] == 2 and state["leds"][10] == 2 and state["leds"][14] == 1
                     assert state["layers"] == original["layers"] and state["macros"] == original["macros"]
                     capture("gui-radio-preview.png")
-                    click(650, 860)
+                    click(700, 860)
                     wait_calls("apply-state", 4)
                     assert json.loads((folder / "state.json").read_text()) == original
-                    click(595, 153)
+                    key("ctrl+3")
                     capture("gui-radio-macros.png")
+                    settings_check(4)
                     (ARTIFACTS / "gui-radio-result.json").write_text(json.dumps({"result": "passed", "hardware": "mock; no HID writes", "checks": ["radio snapshot", "animated RGB preview and pause", "apply and undo LED", "load USB profile RGB while preserving radio data", "undo cross-transport RGB"]}, indent=2))
                     print("Radio GUI smoke passed: lighting, RGB profile conversion and undo; no HID writes.")
                     return
-                click(595, 153)
+                key("ctrl+3")
                 capture("gui-macros-final.png")
                 click(700, 280)
-                subprocess.run(["xdotool", "type", "--clearmodifiers", "Teste GUI"], check=True)
+                subprocess.run(["xdotool", "type", "--clearmodifiers", example], check=True)
                 click(940, 365)
                 click(950, 750)
                 click(985, 860)
@@ -166,29 +228,30 @@ def main():
                 macro_state = json.loads((folder / "state.json").read_text())
                 assert macro_state["layers"][0][9 * 4:9 * 4 + 4] == [3, 1, 1, 0]
                 assert macro_state["macros"][0] == 4
-                assert b"Teste GUI".decode().encode("utf-16le") in bytes(macro_state["macros"])
-                click(730, 153)
+                assert example.encode("utf-16le") in bytes(macro_state["macros"])
+                capture("gui-macro-filled.png")
+                key("ctrl+4")
                 click(250, 414)
-                subprocess.run(["xdotool", "type", "--clearmodifiers", "Teste GUI"], check=True)
+                subprocess.run(["xdotool", "type", "--clearmodifiers", example], check=True)
                 click(980, 414)
                 saved = list((folder / "data/aula-f87pro/profiles").glob("*.json"))
                 assert len(saved) == 1
                 assert json.loads(saved[0].read_text())["state"] == macro_state
                 time.sleep(.4)
                 capture("gui-profiles-final.png")
-                click(650, 860)
+                click(700, 860)
                 wait_calls("apply-state", 4)
                 assert json.loads((folder / "state.json").read_text()) == original
                 click(110, 359)
                 click(985, 860)
                 wait_calls("apply-state", 5)
                 assert json.loads((folder / "state.json").read_text()) == macro_state
-                click(650, 860)
+                click(700, 860)
                 wait_calls("apply-state", 6)
                 assert json.loads((folder / "state.json").read_text()) == original
-                exported = folder / "perfil-exportado.json"
+                exported = folder / "exported-profile.json"
                 click(405, 359)
-                choose_file("Exportar perfil F87 Pro", exported)
+                choose_file("Export F87 Pro profile" if english else "Exportar perfil F87 Pro", exported)
                 for _ in range(30):
                     if exported.exists():
                         break
@@ -196,30 +259,32 @@ def main():
                 assert exported.exists(), f"The native file picker did not export the profile; files: {list(folder.glob('*'))}"
                 assert json.loads(exported.read_text())["state"] == original
                 imported = json.loads(exported.read_text())
-                imported["name"] = "Importado GUI"
+                imported["name"] = imported_name
                 imported["state"] = json.loads(json.dumps(macro_state))
                 imported["state"]["layers"][0][9 * 4:9 * 4 + 4] = [3, 2, 1, 0]
                 exported.write_text(json.dumps(imported))
                 click(245, 359)
-                choose_file("Importar perfil F87 Pro", exported)
+                choose_file("Import F87 Pro profile" if english else "Importar perfil F87 Pro", exported)
                 click(985, 860)
                 wait_calls("apply-state", 7)
                 assert json.loads((folder / "state.json").read_text()) == imported["state"]
-                click(595, 153)
+                key("ctrl+3")
                 capture("gui-imported-mode.png")
-                click(730, 153)
+                key("ctrl+4")
                 imported_profiles = [json.loads(path.read_text()) for path in (folder / "data/aula-f87pro/profiles").glob("*.json")]
-                assert any(profile["name"] == "Importado GUI" and profile["state"] == imported["state"] for profile in imported_profiles)
-                click(650, 860)
+                assert any(profile["name"] == imported_name and profile["state"] == imported["state"] for profile in imported_profiles)
+                click(700, 860)
                 wait_calls("apply-state", 8)
                 assert json.loads((folder / "state.json").read_text()) == original
+                settings_check(8)
                 (ARTIFACTS / "gui-smoke-result.json").write_text(json.dumps({"result": "passed", "checks": ["load actual fixture state", "stage and apply selected LED effect", "undo restores complete original snapshot", "create and stage balanced macro", "bind macro and apply complete snapshot", "save named profile", "reload profile restores macro data and bindings", "export through native file picker", "import through native file picker"], "hardware": "mock backend; no HID writes"}, indent=2) + "\n")
                 print("GUI smoke passed: state, lighting, undo, macro editor and named profiles; no hardware writes.")
             finally:
                 app.terminate()
                 app.wait(timeout=5)
-        log_text = (ARTIFACTS / "gui-smoke.log").read_text()
-        assert "panicked at" not in log_text and "Gtk-CRITICAL" not in log_text, log_text
+                log.flush()
+                log_text = (ARTIFACTS / "gui-smoke.log").read_text()
+                assert "panicked at" not in log_text and "Gtk-CRITICAL" not in log_text, log_text
 
 
 if __name__ == "__main__":

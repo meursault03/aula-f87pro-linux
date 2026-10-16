@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0 — 2026-10-16
+
+- Portuguese and English interfaces, with separate screenshots in each README.
+- Settings page with device-reported version, debounce stages, idle sleep and experimental Tap sensitivity.
+- Local language, start-at-login and quit/minimize preferences; Ctrl+1…5 navigates tabs.
+- Restore the three keyboard behavior settings without changing RGB, keys or macros.
+- Settings use the existing staged apply, backup, readback and undo flow.
+- Firmware flashing and full factory reset remain unavailable; Tap semantics and physical timings need validation.
+
 ## 0.1.0 — 2026-10-15
 
 First public Linux preview.

@@ -1,4 +1,5 @@
 use std::io::{self, ErrorKind};
+pub mod device_settings;
 pub mod discovery;
 mod keys;
 pub mod macros;

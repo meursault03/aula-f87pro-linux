@@ -3,29 +3,30 @@
 [English](README.md) · Português
 
 Um aplicativo nativo para configurar o **AULA F87 Pro no Linux**. Ajuste a
-iluminação, remapeie teclas, prepare macros por USB e mantenha perfis nomeados
-no seu computador. Feito em Rust e GTK4, com um protocolo reconstruído a partir
+iluminação, remapeie teclas, prepare macros por USB, ajuste o comportamento do
+teclado e mantenha perfis nomeados no seu computador. Feito em Rust e GTK4, com um protocolo reconstruído a partir
 do programa original.
 
-[Baixar para Linux](https://github.com/meursault03/aula-f87pro-linux/releases/tag/v0.1.0) ·
-[Instalação](#instalar-no-linux) · [Conexões](#suporte-por-conexão) ·
+[Baixar para Linux](https://github.com/meursault03/aula-f87pro-linux/releases/tag/v0.2.0) ·
+[Instalação](#instalar-no-linux) · [Configurações](#configurações) ·
+[Conexões](#suporte-por-conexão) ·
 [Compilar](CONTRIBUTING.md)
 
-![Aplicativo AULA F87 Pro com teclado TKL alinhado e prévia de iluminação RGB](assets/screenshots/lighting.png)
+![Aplicativo AULA F87 Pro com teclado TKL alinhado e prévia de iluminação RGB](assets/screenshots/pt/lighting.png)
 
 *Interface GTK real com dados de demonstração. A prévia ilustra a configuração
 selecionada; não transmite as cores atuais dos LEDs físicos.*
 
 ## Instalar no Linux
 
-**A versão 0.1.0 é uma prévia experimental para Linux x86_64.**
-Baixe o pacote em [Releases](https://github.com/meursault03/aula-f87pro-linux/releases/tag/v0.1.0):
+**A versão 0.2.0 é uma prévia experimental para Linux x86_64.**
+Baixe o pacote na [página de versões](https://github.com/meursault03/aula-f87pro-linux/releases/tag/v0.2.0):
 
 | Sistema | Arquivo | Instalação |
 | --- | --- | --- |
-| Arch Linux | `aula-f87pro-0.1.0-1-x86_64.pkg.tar.zst` | `sudo pacman -U ./aula-f87pro-0.1.0-1-x86_64.pkg.tar.zst` |
-| Ubuntu 24.04+ / Debian 13+ | `aula-f87pro_0.1.0_amd64.deb` | `sudo apt install ./aula-f87pro_0.1.0_amd64.deb` |
-| Outras distribuições compatíveis | `aula-f87pro-0.1.0-linux-x86_64.tar.gz` | Extraia e execute `python3 install.py --udev` dentro da pasta. |
+| Arch Linux | `aula-f87pro-0.2.0-1-x86_64.pkg.tar.zst` | `sudo pacman -U ./aula-f87pro-0.2.0-1-x86_64.pkg.tar.zst` |
+| Ubuntu 24.04+ / Debian 13+ | `aula-f87pro_0.2.0_amd64.deb` | `sudo apt install ./aula-f87pro_0.2.0_amd64.deb` |
+| Outras distribuições compatíveis | `aula-f87pro-0.2.0-linux-x86_64.tar.gz` | Extraia e execute `python3 install.py --udev` dentro da pasta. |
 
 O arquivo `.tar.gz` precisa de GTK4 ≥ 4.10, glibc ≥ 2.39 e Python 3 para instalar;
 não é um AppImage com todas as bibliotecas incluídas. O instalador usa
@@ -56,7 +57,42 @@ o estado acessível original. As edições ficam locais até serem aplicadas.
 
 | Atribuições de teclas | Perfis e recuperação |
 | --- | --- |
-| ![Teclado físico e função atual da tecla selecionada](assets/screenshots/keys.png) | ![Perfis locais e ações de recuperação](assets/screenshots/profiles.png) |
+| ![Teclado físico e função atual da tecla selecionada](assets/screenshots/pt/keys.png) | ![Perfis locais e ações de recuperação](assets/screenshots/pt/profiles.png) |
+
+## Configurações
+
+Em **Configurações**, consulte informações do dispositivo, ajuste o comportamento
+do teclado e escolha as preferências do aplicativo. Os ajustes do teclado ficam
+no mesmo rascunho da iluminação e das teclas: use **Aplicar alterações** para
+gravá-los ou **Desfazer última alteração** para recuperar a configuração
+confirmada anterior.
+
+| Ajuste do teclado | Valores disponíveis |
+| --- | --- |
+| Debounce | Cinco estágios, como no programa original; não são valores confirmados em milissegundos. |
+| Suspensão por inatividade | Desligada ou 30, 60, 90, 120, 180, 240, 300, 600, 900 ou 1200 segundos. |
+| Tap · experimental | Desligado ou sensibilidade de 10 a 127. A unidade e o efeito físico ainda precisam de validação. |
+
+Os valores de debounce e suspensão foram gravados, relidos e restaurados por USB.
+O rádio permanece experimental; o efeito do Tap e o tempo real de suspensão ainda
+precisam de validação física.
+
+**Restaurar estes três ajustes** prepara debounce no estágio 2, Tap desligado e
+suspensão em 300 segundos. A ação preserva iluminação, teclas e macros; não é
+uma restauração completa de fábrica. Ainda é necessário aplicar o rascunho.
+
+A **Versão informada pelo dispositivo** vem do descritor do dispositivo. Em
+2,4 GHz, é a versão do descritor do receptor, sem confirmação independente da
+versão do firmware do teclado. A gravação de firmware não está disponível.
+
+As preferências do aplicativo ficam neste computador e não alteram o teclado.
+Escolha português ou inglês em **Idioma** e feche e reabra o aplicativo.
+**Iniciar ao entrar na sessão** abre o programa com sua sessão gráfica do Linux.
+Em **Ao fechar a janela**, escolha entre encerrar o aplicativo ou minimizá-lo
+para a barra de tarefas; com a opção de minimizar ativa, use **Encerrar
+aplicativo** no menu superior para sair.
+
+![Configurações em português, com informações do dispositivo e ajustes do teclado](assets/screenshots/pt/settings.png)
 
 ## Suporte por conexão
 
@@ -88,15 +124,18 @@ Monte uma sequência de pressionar, soltar e intervalos, escolha a tecla de dest
 e use **Preparar macro** antes de aplicar. Toda tecla pressionada precisa ser
 liberada. Eventos existentes ainda não editáveis são preservados.
 
-![Editor de macros USB com uma sequência de demonstração](assets/screenshots/macros.png)
+![Editor de macros USB com uma sequência de demonstração](assets/screenshots/pt/macros.png)
 
-*Macro de exemplo capturada com backend simulado e isolado. Os prints não são
+*Macro de exemplo capturada com comunicação simulada e isolada. As capturas não são
 um teste físico do teclado nem uma captura global de digitação.*
 
 ## Dados locais e problemas comuns
 
 Perfis, backups e desfazer ficam em `$XDG_DATA_HOME/aula-f87pro`
-(normalmente `~/.local/share/aula-f87pro`). Nada é enviado para servidores.
+(normalmente `~/.local/share/aula-f87pro`). As preferências do aplicativo ficam
+em `$XDG_CONFIG_HOME/aula-f87pro/settings.json` (normalmente
+`~/.config/aula-f87pro/settings.json`); a inicialização com a sessão usa um
+atalho em `$XDG_CONFIG_HOME/autostart`. Nada é enviado para servidores.
 Perfis podem conter sequências pessoais; confira o conteúdo antes de compartilhá-los.
 
 | Problema | O que conferir |
@@ -107,13 +146,13 @@ Perfis podem conter sequências pessoais; confira o conteúdo antes de compartil
 | Configuração alterada fora do programa | Salve o rascunho como perfil e recarregue ou descarte antes de aplicar. |
 | Janela antiga após atualizar | Feche a instância anterior e abra a versão atualizada. |
 
-Ao abrir uma issue, informe versão, distribuição, ambiente gráfico, conexão e
+Ao relatar um problema, informe versão, distribuição, ambiente gráfico, conexão e
 o texto em **Detalhes da última operação**. Não envie perfis pessoais nem o
 instalador proprietário do Windows.
 
 ## Desenvolvimento e licença
 
 [CONTRIBUTING.md](CONTRIBUTING.md) explica compilação, testes e empacotamento.
-Não são distribuídos executáveis proprietários, firmware ou notas privadas de investigação.
+Não são distribuídos executáveis proprietários ou firmware.
 
 MIT. Projeto comunitário independente, sem vínculo com a AULA.
