@@ -47,7 +47,6 @@ impl Controls {
             ));
         }
         self.validate()?;
-        // OEM FillCfg 0x48abf0 uses full bytes; preserve every unrelated field.
         leds[3] = self.debounce_stage - 1;
         leds[22] = self.tap.unwrap_or(0);
         leds[24] = self.sleep_seconds.map_or(0, |seconds| (seconds / 30) as u8);

@@ -315,7 +315,13 @@ impl Settings {
         }
     }
 
-    pub fn sync(&self, snapshot: Option<&Snapshot>, connected: bool, busy: bool) {
+    pub fn sync(
+        &self,
+        snapshot: Option<&Snapshot>,
+        transport: Option<Transport>,
+        connected: bool,
+        busy: bool,
+    ) {
         self.syncing.set(true);
         let controls = snapshot.and_then(|s| Controls::read(&s.leds).ok());
         self.device.set_sensitive(controls.is_some() && !busy);
@@ -344,17 +350,10 @@ impl Settings {
         } else {
             self.note.set_text(t("Carregue uma configuração reconhecida para editar estes ajustes. Valores desconhecidos são preservados.", "Load a recognized configuration to edit these settings. Unknown values are preserved."));
         }
-        let expected = snapshot.map(|s| {
-            if s.version == 2 {
-                Transport::Receiver24G
-            } else {
-                Transport::UsbCable
-            }
-        });
         let device = discovery::connections()
             .unwrap_or_default()
             .into_iter()
-            .filter(|c| expected.is_none_or(|transport| transport == c.transport))
+            .filter(|c| transport.is_none_or(|transport| transport == c.transport))
             .min_by_key(|c| c.transport != Transport::UsbCable);
         self.firmware.set_text(
             &device
@@ -364,7 +363,7 @@ impl Settings {
                 .unwrap_or_else(|| t("Indisponível", "Unavailable").into()),
         );
         self.connection.set_text(
-            match (connected, expected.or(device.map(|c| c.transport))) {
+            match (connected, transport.or(device.map(|c| c.transport))) {
                 (true, Some(Transport::UsbCable)) => {
                     t("USB · configuração carregada", "USB · configuration loaded")
                 }
@@ -376,7 +375,11 @@ impl Settings {
                     "Receptor detectado; teclado indisponível.",
                     "Receiver detected; keyboard unavailable.",
                 ),
-                _ => t("Nenhum teclado conectado.", "No keyboard connected."),
+                (_, Some(Transport::UsbCable)) => t(
+                    "USB detectado; configuração indisponível.",
+                    "USB detected; configuration unavailable.",
+                ),
+                (_, None) => t("Nenhum teclado conectado.", "No keyboard connected."),
             },
         );
         self.syncing.set(false);

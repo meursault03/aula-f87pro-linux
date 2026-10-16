@@ -584,7 +584,12 @@ impl Editor {
     pub fn refresh(&self) {
         if let Some(settings) = self.settings.borrow().as_ref() {
             let session = self.session.borrow();
-            settings.sync(session.draft.as_ref(), session.connected, self.busy.get());
+            settings.sync(
+                session.draft.as_ref(),
+                self.transport.get(),
+                session.connected,
+                self.busy.get(),
+            );
         }
         self.syncing.set(true);
         let session = self.session.borrow();
